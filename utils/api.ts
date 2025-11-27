@@ -69,6 +69,53 @@ export const searchTracks = async (
 };
 
 /**
+ * Получить треки конкретного жанра
+ */
+export const getGenreTracks = async (
+    genreId: number,
+    limit: number = 20
+): Promise<Track[]> => {
+    try {
+        const url = new URL(`${API_BASE_URL}/api/genre/${genreId}`);
+        url.searchParams.append('limit', limit.toString());
+
+        const response = await fetch(url.toString(), {
+            headers: {
+                'tuna-skip-browser-warning': 'true'
+            }
+        });
+
+        if (!response.ok) {
+            const error: ApiError = await response.json();
+            throw new Error(error.detail || 'Ошибка при получении треков жанра');
+        }
+
+        const data: SearchResponse = await response.json();
+
+        // Преобразуем данные в формат Track
+        return data.results.map(track => {
+            let audioUrl = (track as any).url;
+            if (audioUrl && audioUrl.startsWith('/')) {
+                audioUrl = `${API_BASE_URL}${audioUrl}`;
+            }
+
+            return {
+                id: track.id,
+                title: track.title,
+                artist: track.artist,
+                coverUrl: (track as any).image,
+                audioUrl: audioUrl,
+                duration: track.duration,
+                isLocal: false
+            };
+        });
+    } catch (error) {
+        console.error('Genre tracks error:', error);
+        throw error;
+    }
+};
+
+/**
  * Получить информацию о треке по ID
  */
 export const getTrack = async (trackId: string): Promise<Track> => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, MoreVertical, Search, Loader } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { Track } from '../types';
-import { searchTracks } from '../utils/api';
+import { searchTracks, getGenreTracks } from '../utils/api';
 import { hapticFeedback } from '../utils/telegram';
 
 const HomeView: React.FC = () => {
@@ -153,18 +153,36 @@ const HomeView: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-100">Жанры</h3>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { name: 'Рок', query: 'rock', gradient: 'from-red-500 to-orange-500' },
-              { name: 'Поп', query: 'pop', gradient: 'from-pink-500 to-purple-500' },
-              { name: 'Хип-хоп', query: 'hip hop', gradient: 'from-yellow-500 to-green-500' },
-              { name: 'Электроника', query: 'electronic', gradient: 'from-blue-500 to-cyan-500' },
-              { name: 'Релакс', query: 'relax', gradient: 'from-green-500 to-teal-500' },
-              { name: 'Тренировки', query: 'workout', gradient: 'from-orange-500 to-red-600' },
+              { name: 'Рок', genreId: 6, gradient: 'from-red-500 to-orange-500' },
+              { name: 'Поп', genreId: 2, gradient: 'from-pink-500 to-purple-500' },
+              { name: 'Хип-хоп', genreId: 99, gradient: 'from-yellow-500 to-green-500' },
+              { name: 'Электроника', genreId: 8, gradient: 'from-blue-500 to-cyan-500' },
+              { name: 'Релакс', genreId: 51, gradient: 'from-green-500 to-teal-500' },
+              { name: 'Танцевальная', genreId: 11, gradient: 'from-orange-500 to-red-600' },
             ].map((genre) => (
               <button
                 key={genre.name}
-                onClick={() => {
-                  setSearchState(prev => ({ ...prev, query: genre.query }));
+                onClick={async () => {
                   hapticFeedback.light();
+                  setSearchState(prev => ({ ...prev, isSearching: true, results: [], query: genre.name }));
+
+                  try {
+                    const results = await getGenreTracks(genre.genreId, 20);
+                    setSearchState(prev => ({
+                      ...prev,
+                      results,
+                      isSearching: false,
+                      hasMore: results.length >= 20,
+                      error: results.length === 0 ? 'Ничего не найдено' : null
+                    }));
+                  } catch (err) {
+                    console.error('Genre error:', err);
+                    setSearchState(prev => ({
+                      ...prev,
+                      isSearching: false,
+                      error: 'Ошибка при загрузке жанра'
+                    }));
+                  }
                 }}
                 className={`p-4 rounded-xl bg-gradient-to-br ${genre.gradient} text-white font-semibold shadow-lg hover:scale-105 transition-transform active:scale-95`}
               >

@@ -145,6 +145,97 @@ class HitmoParser:
             return None
         except:
             return None
+    
+    def get_genre_tracks(self, genre_id: int, limit: int = 20) -> List[Dict]:
+        """
+        Get tracks from a specific genre
+        """
+        try:
+            url = f"{self.BASE_URL}/genre/{genre_id}"
+            
+            with httpx.Client(headers=self.headers, timeout=10.0) as client:
+                response = client.get(url)
+                response.raise_for_status()
+                
+                soup = BeautifulSoup(response.text, 'html.parser')
+                tracks = []
+                
+                # Find all track blocks (same structure as search)
+                track_elements = soup.select('.tracks__item')
+                
+                for el in track_elements:
+                    if len(tracks) >= limit:
+                        break
+                        
+                    try:
+                        # Extract basic info
+                        title_el = el.select_one('.track__title')
+                        artist_el = el.select_one('.track__desc')
+                        time_el = el.select_one('.track__fulltime')
+                        download_el = el.select_one('a.track__download-btn')
+                        cover_el = el.select_one('.track__img')
+                        
+                        if not (title_el and download_el):
+                            continue
+                            
+                        title = title_el.text.strip()
+                        artist = artist_el.text.strip() if artist_el else "Unknown"
+                        duration_str = time_el.text.strip() if time_el else "00:00"
+                        
+                        # Parse duration to seconds
+                        try:
+                            mins, secs = map(int, duration_str.split(':'))
+                            duration = mins * 60 + secs
+                        except:
+                            duration = 0
+                            
+                        # URL
+                        url = download_el.get('href')
+                        if not url:
+                            continue
+                            
+                        # ID
+                        track_id = el.get('data-track-id')
+                        if not track_id:
+                            track_id = f"gen_{abs(hash(artist + title))}"
+                            
+                        # Cover
+                        image = None
+                        
+                        # Try to get high quality cover from iTunes
+                        try:
+                            image = self._get_itunes_cover(artist, title)
+                        except Exception as e:
+                            print(f"iTunes cover error: {e}")
+                            
+                        # Fallback to Hitmo cover if iTunes failed
+                        if not image and cover_el:
+                            style = cover_el.get('style', '')
+                            match = re.search(r"url\(['\"]?(.*?)['\"]?\)", style)
+                            if match:
+                                image = match.group(1)
+                        
+                        if not image:
+                            image = f"https://ui-avatars.com/api/?name={urllib.parse.quote(artist)}&size=200&background=random"
+                            
+                        tracks.append({
+                            'id': track_id,
+                            'title': title,
+                            'artist': artist,
+                            'duration': duration,
+                            'url': url,
+                            'image': image
+                        })
+                        
+                    except Exception as e:
+                        print(f"Error parsing track: {e}")
+                        continue
+                        
+                return tracks
+                
+        except Exception as e:
+            print(f"Genre tracks error: {e}")
+            return []
 
     def close(self):
         pass

@@ -134,6 +134,51 @@ async def get_track(track_id: str):
     )
 
 
+@app.get("/api/genre/{genre_id}")
+async def get_genre_tracks(
+    genre_id: int,
+    limit: int = Query(20, description="Максимальное количество результатов", ge=1, le=50)
+):
+    """
+    Получение треков конкретного жанра
+    
+    Args:
+        genre_id: ID жанра на Hitmo (например, 2 для Поп, 6 для Рок)
+        limit: Максимальное количество результатов (1-50)
+        
+    Returns:
+        Список треков жанра
+    """
+    try:
+        tracks = parser.get_genre_tracks(genre_id, limit=limit)
+        
+        # Конвертируем в Pydantic модели и оборачиваем URL в прокси
+        track_models = []
+        base_url = ""
+        
+        for track in tracks:
+            original_url = track['url']
+            if original_url:
+                from urllib.parse import quote
+                encoded_url = quote(original_url)
+                track['url'] = f"{base_url}/api/stream?url={encoded_url}"
+            
+            track_models.append(Track(**track))
+        
+        return {
+            "results": track_models,
+            "count": len(track_models),
+            "genre_id": genre_id
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при получении треков жанра: {str(e)}"
+        )
+
+
+
 from fastapi.responses import StreamingResponse
 import httpx
 
