@@ -1,0 +1,318 @@
+import React, { useState, useEffect } from 'react';
+import { Play, MoreVertical, Search, Loader } from 'lucide-react';
+import { usePlayer } from '../context/PlayerContext';
+import { Track } from '../types';
+import { searchTracks } from '../utils/api';
+import { hapticFeedback } from '../utils/telegram';
+
+const HomeView: React.FC = () => {
+  const {
+    playTrack,
+    currentTrack,
+    isPlaying,
+    allTracks,
+    downloadTrack,
+    downloadedTracks,
+    isDownloading,
+    togglePlay,
+    searchState,
+    setSearchState
+  } = usePlayer();
+
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [trackToAction, setTrackToAction] = useState<Track | null>(null);
+  const { playlists, addToPlaylist } = usePlayer();
+
+  // Отображаемые треки: результаты поиска или все треки
+  const displayTracks = searchState.query.trim() ? searchState.results : allTracks;
+
+  // Поиск с debounce
+  useEffect(() => {
+    if (!searchState.query.trim()) {
+      setSearchState(prev => ({ ...prev, results: [], hasMore: true, error: null }));
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setSearchState(prev => ({ ...prev, isSearching: true, error: null, page: 1 }));
+
+      try {
+        const results = await searchTracks(searchState.query, 20, 1);
+        setSearchState(prev => ({
+          ...prev,
+          results,
+          hasMore: results.length >= 20,
+          isSearching: false,
+          error: results.length === 0 ? 'Ничего не найдено' : null
+        }));
+      } catch (err) {
+        console.error('Search error:', err);
+        setSearchState(prev => ({
+          ...prev,
+          isSearching: false,
+          error: 'Ошибка при поиске. Проверьте подключение к серверу.'
+        }));
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchState.query, setSearchState]);
+
+  const loadMore = async () => {
+    if (isLoadingMore || !searchState.hasMore) return;
+
+    setIsLoadingMore(true);
+    const nextPage = searchState.page + 1;
+
+    try {
+      const newResults = await searchTracks(searchState.query, 20, nextPage);
+
+      if (newResults.length === 0) {
+        setSearchState(prev => ({ ...prev, hasMore: false }));
+      } else {
+        setSearchState(prev => ({
+          ...prev,
+          results: [...prev.results, ...newResults],
+          page: nextPage,
+          hasMore: newResults.length >= 20
+        }));
+      }
+    } catch (err) {
+      console.error('Load more error:', err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  const handlePlay = (track: Track) => {
+    hapticFeedback.light();
+    if (currentTrack?.id === track.id) {
+      togglePlay();
+    } else {
+      playTrack(track, displayTracks);
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchState(prev => ({ ...prev, query }));
+
+    if (query.trim().length > 2) {
+      // Debounce search is handled by the useEffect above,
+      // so we just update the query here.
+      // The previous implementation had a local debounce here,
+      // but with searchState and useEffect, it's cleaner to let useEffect handle it.
+    } else if (query.trim().length === 0) {
+      // If query is empty, clear results immediately
+      setSearchState(prev => ({ ...prev, results: [], hasMore: true, error: null }));
+    }
+  };
+
+  return (
+    <div className="px-4 py-8 space-y-8 animate-fade-in-up pb-24">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+          Музыка
+        </h1>
+        <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs">
+          TG
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+          {searchState.isSearching ? (
+            <Loader size={18} className="animate-spin" />
+          ) : (
+            <Search size={18} />
+          )}
+        </div>
+        <input
+          type="text"
+          placeholder="Поиск музыки..."
+          value={searchState.query}
+          onChange={handleSearchChange}
+          className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+        />
+      </div>
+
+      {/* Error Message */}
+      {searchState.error && (
+        <div className="text-center py-4 text-gray-400 text-sm">
+          {searchState.error}
+        </div>
+      )}
+
+      {/* Track List */}
+      <div>
+        <h3 className="text-lg font-semibold mb-4 text-gray-100">
+          {searchState.query.trim() ? 'Результаты поиска' : 'Популярное'}
+        </h3>
+        <div className="space-y-3">
+          {displayTracks.length === 0 && !searchState.isSearching && !searchState.error && (
+            <div className="text-center py-8 text-gray-400">
+              Начните поиск, чтобы найти музыку
+            </div>
+          )}
+
+          {displayTracks.map((track) => {
+            const isCurrent = currentTrack?.id === track.id;
+            return (
+              <div
+                key={track.id}
+                className={`flex items-center p-3 rounded-xl transition-all cursor-pointer ${isCurrent ? 'bg-white/10 border border-white/5' : 'hover:bg-white/5'
+                  }`}
+                onClick={() => handlePlay(track)}
+              >
+                <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 mr-4 group">
+                  <img
+                    src={track.coverUrl}
+                    alt={track.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback image on error
+                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(track.artist)}&size=200&background=random`;
+                    }}
+                  />
+                  <div className={`absolute inset-0 bg-black/40 flex items-center justify-center ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}>
+                    {isCurrent && isPlaying ? (
+                      <div className="flex space-x-[2px] items-end h-4">
+                        <div className="w-[3px] bg-blue-400 animate-bounce h-2"></div>
+                        <div className="w-[3px] bg-blue-400 animate-bounce h-4 delay-75"></div>
+                        <div className="w-[3px] bg-blue-400 animate-bounce h-3 delay-150"></div>
+                      </div>
+                    ) : (
+                      <Play size={16} fill="white" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <h4 className={`text-sm font-medium truncate ${isCurrent ? 'text-blue-400' : 'text-white'
+                    }`}>
+                    {track.title}
+                  </h4>
+                  <p className="text-xs text-gray-400 truncate">{track.artist}</p>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  {/* Download Button */}
+                  <button
+                    className={`p-2 transition-colors ${downloadedTracks.has(track.id)
+                      ? 'text-blue-400'
+                      : isDownloading === track.id
+                        ? 'text-blue-400 animate-pulse'
+                        : 'text-gray-500 hover:text-white'
+                      }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (downloadedTracks.has(track.id)) {
+                        // TODO: Confirm removal
+                        // removeDownloadedTrack(track.id);
+                      } else {
+                        downloadTrack(track);
+                      }
+                    }}
+                    disabled={isDownloading === track.id}
+                  >
+                    {isDownloading === track.id ? (
+                      <Loader size={16} className="animate-spin" />
+                    ) : downloadedTracks.has(track.id) ? (
+                      <div className="relative">
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                      </div>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    )}
+                  </button>
+
+                  <button
+                    className="p-2 text-gray-500 hover:text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      hapticFeedback.selection();
+                      setTrackToAction(track);
+                      setShowActionModal(true);
+                    }}
+                  >
+                    <MoreVertical size={16} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Load More Button */}
+        {searchState.query.trim() && searchState.hasMore && displayTracks.length > 0 && (
+          <div className="mt-6 flex justify-center">
+            <button
+              onClick={loadMore}
+              disabled={isLoadingMore}
+              className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
+            >
+              {isLoadingMore ? (
+                <>
+                  <Loader size={14} className="animate-spin" />
+                  <span>Загрузка...</span>
+                </>
+              ) : (
+                <span>Показать еще</span>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Action Modal (Add to Playlist) */}
+      {showActionModal && trackToAction && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in" onClick={() => setShowActionModal(false)}>
+          <div className="bg-gray-900 w-full max-w-sm p-6 rounded-t-2xl sm:rounded-2xl border-t sm:border border-white/10 shadow-2xl transform transition-transform" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-4 text-white">Добавить в плейлист</h3>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {playlists.length === 0 ? (
+                <div className="text-center text-gray-500 py-4">
+                  Нет плейлистов. Создайте первый!
+                </div>
+              ) : (
+                playlists.map(playlist => (
+                  <button
+                    key={playlist.id}
+                    className="w-full flex items-center p-3 rounded-xl hover:bg-white/5 transition-colors text-left"
+                    onClick={() => {
+                      addToPlaylist(playlist.id, trackToAction);
+                      setShowActionModal(false);
+                      setTrackToAction(null);
+                      hapticFeedback.success();
+                    }}
+                  >
+                    <div className="w-10 h-10 rounded-lg overflow-hidden mr-3">
+                      <img src={playlist.coverUrl} alt={playlist.name} className="w-full h-full object-cover" />
+                    </div>
+                    <span className="text-white font-medium">{playlist.name}</span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <button
+              className="w-full mt-4 py-3 bg-gray-800 rounded-xl font-medium text-gray-300 hover:bg-gray-700 transition-colors"
+              onClick={() => setShowActionModal(false)}
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default HomeView;

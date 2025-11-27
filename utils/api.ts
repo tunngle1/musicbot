@@ -1,0 +1,108 @@
+/**
+ * API Client for Music Backend
+ * Клиент для взаимодействия с FastAPI бэкендом
+ */
+
+import { Track } from '../types';
+
+// API Configuration
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+interface SearchResponse {
+    results: Track[];
+    count: number;
+}
+
+interface ApiError {
+    detail: string;
+}
+
+/**
+ * Поиск треков
+ */
+export const searchTracks = async (
+    query: string,
+    limit: number = 20,
+    page: number = 1
+): Promise<Track[]> => {
+    try {
+        const url = new URL(`${API_BASE_URL}/api/search`);
+        url.searchParams.append('q', query);
+        url.searchParams.append('limit', limit.toString());
+        url.searchParams.append('page', page.toString());
+
+        const response = await fetch(url.toString());
+
+        if (!response.ok) {
+            const error: ApiError = await response.json();
+            throw new Error(error.detail || 'Ошибка при поиске треков');
+        }
+
+        const data: SearchResponse = await response.json();
+
+        // Преобразуем данные в формат Track
+        return data.results.map(track => ({
+            id: track.id,
+            title: track.title,
+            artist: track.artist,
+            coverUrl: (track as any).image,
+            audioUrl: (track as any).url,
+            duration: track.duration,
+            isLocal: false
+        }));
+    } catch (error) {
+        console.error('Search error:', error);
+        throw error;
+    }
+};
+
+/**
+ * Получить информацию о треке по ID
+ */
+export const getTrack = async (trackId: string): Promise<Track> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/track/${trackId}`);
+
+        if (!response.ok) {
+            const error: ApiError = await response.json();
+            throw new Error(error.detail || 'Ошибка при получении трека');
+        }
+
+        const track = await response.json();
+
+        return {
+            id: track.id,
+            title: track.title,
+            artist: track.artist,
+            coverUrl: (track as any).image,
+            audioUrl: (track as any).url,
+            duration: track.duration,
+            isLocal: false
+        };
+    } catch (error) {
+        console.error('Get track error:', error);
+        throw error;
+    }
+};
+
+/**
+ * Проверка работоспособности API
+ */
+export const checkHealth = async (): Promise<boolean> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`);
+        return response.ok;
+    } catch (error) {
+        console.error('Health check error:', error);
+        return false;
+    }
+};
+
+/**
+ * Форматирование времени из секунд в MM:SS
+ */
+export const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
