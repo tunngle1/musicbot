@@ -23,7 +23,7 @@ interface MusicDB extends DBSchema {
 }
 
 const DB_NAME = 'tg-music-player-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 class StorageService {
     private dbPromise: Promise<IDBPDatabase<MusicDB>>;
@@ -31,6 +31,7 @@ class StorageService {
     constructor() {
         this.dbPromise = openDB<MusicDB>(DB_NAME, DB_VERSION, {
             upgrade(db, oldVersion, newVersion, transaction) {
+                console.log(`Upgrading DB from ${oldVersion} to ${newVersion}`);
                 if (oldVersion < 1) {
                     const trackStore = db.createObjectStore('tracks', { keyPath: 'id' });
                     trackStore.createIndex('by-date', 'savedAt');
@@ -39,6 +40,18 @@ class StorageService {
                     const playlistStore = db.createObjectStore('playlists', { keyPath: 'id' });
                     playlistStore.createIndex('by-date', 'createdAt');
                 }
+            },
+            blocked(currentVersion, blockedVersion, event) {
+                console.warn("DB Open Blocked: Another tab has the DB open", currentVersion, blockedVersion);
+            },
+            blocking(currentVersion, blockedVersion, event) {
+                console.warn("DB Open Blocking: This tab is blocking a version upgrade", currentVersion, blockedVersion);
+                // Закрываем соединение, чтобы дать возможность обновиться
+                const db = (event.target as any).result;
+                db.close();
+            },
+            terminated() {
+                console.error("DB Connection Terminated Abruptly");
             },
         });
     }

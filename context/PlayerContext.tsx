@@ -87,20 +87,37 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Загрузка скачанных треков и плейлистов при старте
   useEffect(() => {
     const loadData = async () => {
-      // Загрузка треков
-      const tracks = await storage.getAllTracks();
-      const ids = new Set(tracks.map(t => t.id));
-      setDownloadedTracks(ids);
+      try {
+        console.log("Loading data from storage...");
 
-      // Загрузка плейлистов
-      const savedPlaylists = await storage.getAllPlaylists();
-      if (savedPlaylists.length > 0) {
-        setPlaylists(prev => {
-          // Объединяем дефолтные и сохраненные, избегая дубликатов по ID
-          const defaultIds = new Set(INITIAL_PLAYLISTS.map(p => p.id));
-          const newPlaylists = savedPlaylists.filter(p => !defaultIds.has(p.id));
-          return [...INITIAL_PLAYLISTS, ...newPlaylists];
-        });
+        // Загрузка треков
+        try {
+          const tracks = await storage.getAllTracks();
+          const ids = new Set(tracks.map(t => t.id));
+          setDownloadedTracks(ids);
+          console.log(`Loaded ${tracks.length} tracks`);
+        } catch (e) {
+          console.error("Failed to load tracks:", e);
+        }
+
+        // Загрузка плейлистов
+        try {
+          const savedPlaylists = await storage.getAllPlaylists();
+          console.log(`Loaded ${savedPlaylists.length} playlists`);
+
+          if (savedPlaylists.length > 0) {
+            setPlaylists(prev => {
+              // Объединяем дефолтные и сохраненные, избегая дубликатов по ID
+              const defaultIds = new Set(INITIAL_PLAYLISTS.map(p => p.id));
+              const newPlaylists = savedPlaylists.filter(p => !defaultIds.has(p.id));
+              return [...INITIAL_PLAYLISTS, ...newPlaylists];
+            });
+          }
+        } catch (e) {
+          console.error("Failed to load playlists:", e);
+        }
+      } catch (e) {
+        console.error("Critical error loading data:", e);
       }
     };
     loadData();

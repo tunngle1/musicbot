@@ -148,7 +148,11 @@ async def stream_audio(request: Request, url: str = Query(..., description="URL 
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
     
-    client = httpx.AsyncClient(follow_redirects=True)
+    # Timeout configuration:
+    # connect=10.0: wait max 10s to establish connection
+    # read=None: wait indefinitely for data (important for streaming large files on slow connections)
+    timeout = httpx.Timeout(10.0, read=None)
+    client = httpx.AsyncClient(follow_redirects=True, timeout=timeout)
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',

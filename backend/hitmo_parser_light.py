@@ -140,7 +140,8 @@ class HitmoParser:
                         # Get artwork url and replace size with 600x600
                         artwork = data['results'][0].get('artworkUrl100')
                         if artwork:
-                            return artwork.replace('100x100bb', '600x600bb')
+                            # Replace any size (e.g. 100x100bb, 60x60bb) with 600x600bb
+                            return re.sub(r'\d+x\d+bb', '600x600bb', artwork)
             return None
         except:
             return None
