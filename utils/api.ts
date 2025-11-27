@@ -33,7 +33,7 @@ export const searchTracks = async (
 
         const response = await fetch(url.toString(), {
             headers: {
-                'ngrok-skip-browser-warning': 'true'
+                'tuna-skip-browser-warning': 'true'
             }
         });
 
@@ -65,7 +65,11 @@ export const searchTracks = async (
  */
 export const getTrack = async (trackId: string): Promise<Track> => {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/track/${trackId}`);
+        const response = await fetch(`${API_BASE_URL}/api/track/${trackId}`, {
+            headers: {
+                'tuna-skip-browser-warning': 'true'
+            }
+        });
 
         if (!response.ok) {
             const error: ApiError = await response.json();
