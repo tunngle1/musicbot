@@ -9,9 +9,9 @@ from typing import List, Optional
 import uvicorn
 
 try:
-    from backend.hitmo_parser import HitmoParser
+    from backend.hitmo_parser_light import HitmoParser
 except ImportError:
-    from hitmo_parser import HitmoParser
+    from hitmo_parser_light import HitmoParser
 
 
 # Pydantic модели
