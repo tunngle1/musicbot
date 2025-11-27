@@ -6,7 +6,7 @@
 import { Track } from '../types';
 
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://sheilah-cadastral-adriana.ngrok-free.dev';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://88b2so-103-35-189-138.ru.tuna.am';
 
 interface SearchResponse {
     results: Track[];
@@ -31,7 +31,11 @@ export const searchTracks = async (
         url.searchParams.append('limit', limit.toString());
         url.searchParams.append('page', page.toString());
 
-        const response = await fetch(url.toString());
+        const response = await fetch(url.toString(), {
+            headers: {
+                'ngrok-skip-browser-warning': 'true'
+            }
+        });
 
         if (!response.ok) {
             const error: ApiError = await response.json();
