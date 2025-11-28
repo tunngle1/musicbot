@@ -27,6 +27,8 @@ const HomeView: React.FC = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [radioStations, setRadioStations] = useState<RadioStation[]>([]);
   const [isLoadingRadio, setIsLoadingRadio] = useState(false);
+  const [showAllRadio, setShowAllRadio] = useState(false);
+  const [showAllGenres, setShowAllGenres] = useState(false);
   const { playlists, addToPlaylist } = usePlayer();
 
   // Отображаемые треки: результаты поиска или все треки
@@ -200,7 +202,16 @@ const HomeView: React.FC = () => {
       {/* Genres Section - Only show when not searching and no results */}
       {!searchState.query.trim() && searchState.results.length === 0 && !searchState.isSearching && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-100">Жанры</h3>
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-gray-100">Жанры</h3>
+            <button
+              onClick={() => setShowAllGenres(!showAllGenres)}
+              className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              {showAllGenres ? 'Свернуть' : 'Все'}
+            </button>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             {[
               { name: 'Рок', genreId: 6, gradient: 'from-red-500 to-orange-500' },
@@ -209,7 +220,19 @@ const HomeView: React.FC = () => {
               { name: 'Электроника', genreId: 8, gradient: 'from-blue-500 to-cyan-500' },
               { name: 'Релакс', genreId: 51, gradient: 'from-green-500 to-teal-500' },
               { name: 'Танцевальная', genreId: 11, gradient: 'from-orange-500 to-red-600' },
-            ].map((genre) => (
+              { name: 'Альтернатива', genreId: 5, gradient: 'from-purple-600 to-indigo-600' },
+              { name: 'Метал', genreId: 7, gradient: 'from-gray-700 to-black' },
+              { name: 'Дабстеп', genreId: 10, gradient: 'from-indigo-500 to-purple-500' },
+              { name: 'Драм-н-бэйс', genreId: 12, gradient: 'from-yellow-600 to-red-600' },
+              { name: 'Транс', genreId: 13, gradient: 'from-cyan-500 to-blue-600' },
+              { name: 'Шансон', genreId: 15, gradient: 'from-yellow-700 to-orange-700' },
+              { name: 'Классика', genreId: 17, gradient: 'from-yellow-200 to-yellow-500' },
+              { name: 'Джаз', genreId: 19, gradient: 'from-indigo-400 to-purple-400' },
+              { name: 'Фолк', genreId: 22, gradient: 'from-green-600 to-emerald-600' },
+              { name: 'Кантри', genreId: 23, gradient: 'from-orange-400 to-amber-600' },
+              { name: 'Латино', genreId: 24, gradient: 'from-red-500 to-pink-600' },
+              { name: 'Блюз', genreId: 25, gradient: 'from-blue-700 to-indigo-800' },
+            ].slice(0, showAllGenres ? undefined : 6).map((genre) => (
               <button
                 key={genre.name}
                 onClick={async () => {
@@ -240,6 +263,15 @@ const HomeView: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {!showAllGenres && (
+            <button
+              onClick={() => setShowAllGenres(true)}
+              className="w-full py-3 bg-white/5 rounded-xl text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
+            >
+              Показать все жанры
+            </button>
+          )}
         </div>
       )}
 
@@ -281,223 +313,238 @@ const HomeView: React.FC = () => {
               <Loader size={32} className="animate-spin text-blue-400" />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {radioStations.map((station) => {
-                const isCurrentStation = isRadioMode && currentRadio?.id === station.id;
-                return (
-                  <button
-                    key={station.id}
-                    onClick={() => handleRadioPlay(station)}
-                    className={`relative p-4 rounded-xl transition-all ${isCurrentStation
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                {radioStations.slice(0, showAllRadio ? undefined : 6).map((station) => {
+                  const isCurrentStation = isRadioMode && currentRadio?.id === station.id;
+                  return (
+                    <button
+                      key={station.id}
+                      onClick={() => handleRadioPlay(station)}
+                      className={`relative p-4 rounded-xl transition-all ${isCurrentStation
                         ? 'bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-2 border-blue-400'
                         : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                      }`}
-                  >
-                    <div className="aspect-square rounded-lg overflow-hidden mb-3 relative">
-                      <img
-                        src={station.image}
-                        alt={station.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(station.name)}&size=200&background=random`;
-                        }}
-                      />
-                      {isCurrentStation && isPlaying && (
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                          <div className="flex space-x-1 items-end h-4">
-                            <div className="w-1 bg-blue-400 animate-pulse h-2"></div>
-                            <div className="w-1 bg-blue-400 animate-pulse h-4" style={{ animationDelay: '0.2s' }}></div>
-                            <div className="w-1 bg-blue-400 animate-pulse h-3" style={{ animationDelay: '0.4s' }}></div>
+                        }`}
+                    >
+                      <div className="aspect-square rounded-lg overflow-hidden mb-3 relative">
+                        <img
+                          src={station.image}
+                          alt={station.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(station.name)}&size=200&background=random`;
+                          }}
+                        />
+                        {isCurrentStation && isPlaying && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                            <div className="flex space-x-1 items-end h-4">
+                              <div className="w-1 bg-blue-400 animate-pulse h-2"></div>
+                              <div className="w-1 bg-blue-400 animate-pulse h-4" style={{ animationDelay: '0.2s' }}></div>
+                              <div className="w-1 bg-blue-400 animate-pulse h-3" style={{ animationDelay: '0.4s' }}></div>
+                            </div>
                           </div>
+                        )}
+                      </div>
+                      <h4 className={`text-sm font-semibold truncate ${isCurrentStation ? 'text-blue-400' : 'text-white'
+                        }`}>
+                        {station.name}
+                      </h4>
+                      <p className="text-xs text-gray-400 truncate">{station.genre}</p>
+                      {isCurrentStation && (
+                        <div className="absolute top-2 right-2 px-2 py-1 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+                          LIVE
                         </div>
                       )}
-                    </div>
-                    <h4 className={`text-sm font-semibold truncate ${isCurrentStation ? 'text-blue-400' : 'text-white'
-                      }`}>
-                      {station.name}
-                    </h4>
-                    <p className="text-xs text-gray-400 truncate">{station.genre}</p>
-                    {isCurrentStation && (
-                      <div className="absolute top-2 right-2 px-2 py-1 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
-                        LIVE
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {radioStations.length > 6 && (
+                <button
+                  onClick={() => setShowAllRadio(!showAllRadio)}
+                  className="w-full py-3 bg-white/5 rounded-xl text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
+                >
+                  {showAllRadio ? 'Свернуть' : 'Показать все станции'}
+                </button>
+              )}
             </div>
           )}
         </div>
       )}
 
       {/* Track List - Only show when searching */}
-      {(searchState.query.trim() || searchState.results.length > 0) && (
-        <div>
-          <h3 className="text-lg font-semibold mb-4 text-gray-100">
-            {searchState.query.trim() ? 'Результаты поиска' : 'Популярное'}
-          </h3>
-          <div className="space-y-3">
-            {displayTracks.length === 0 && !searchState.isSearching && !searchState.error && (
-              <div className="text-center py-8 text-gray-400">
-                Начните поиск, чтобы найти музыку
+      {
+        (searchState.query.trim() || searchState.results.length > 0) && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-gray-100">
+              {searchState.query.trim() ? 'Результаты поиска' : 'Популярное'}
+            </h3>
+            <div className="space-y-3">
+              {displayTracks.length === 0 && !searchState.isSearching && !searchState.error && (
+                <div className="text-center py-8 text-gray-400">
+                  Начните поиск, чтобы найти музыку
+                </div>
+              )}
+
+              {displayTracks.map((track) => {
+                const isCurrent = currentTrack?.id === track.id;
+                return (
+                  <div
+                    key={track.id}
+                    className={`flex items-center p-3 rounded-xl transition-all cursor-pointer ${isCurrent ? 'bg-white/10 border border-white/5' : 'hover:bg-white/5'
+                      }`}
+                    onClick={() => handlePlay(track)}
+                  >
+                    <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 mr-4 group">
+                      <img
+                        src={track.coverUrl}
+                        alt={track.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback image on error
+                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(track.artist)}&size=200&background=random`;
+                        }}
+                      />
+                      <div className={`absolute inset-0 bg-black/40 flex items-center justify-center ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        }`}>
+                        {isCurrent && isPlaying ? (
+                          <div className="flex space-x-[2px] items-end h-4">
+                            <div className="w-[3px] bg-blue-400 animate-bounce h-2"></div>
+                            <div className="w-[3px] bg-blue-400 animate-bounce h-4 delay-75"></div>
+                            <div className="w-[3px] bg-blue-400 animate-bounce h-3 delay-150"></div>
+                          </div>
+                        ) : (
+                          <Play size={16} fill="white" />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <h4 className={`text-sm font-medium truncate ${isCurrent ? 'text-blue-400' : 'text-white'
+                        }`}>
+                        {track.title}
+                      </h4>
+                      <p className="text-xs text-gray-400 truncate">{track.artist}</p>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      {/* Download Button */}
+                      <button
+                        className={`p-2 transition-colors ${downloadedTracks.has(track.id)
+                          ? 'text-blue-400'
+                          : isDownloading === track.id
+                            ? 'text-blue-400 animate-pulse'
+                            : 'text-gray-500 hover:text-white'
+                          }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (downloadedTracks.has(track.id)) {
+                            // TODO: Confirm removal
+                            // removeDownloadedTrack(track.id);
+                          } else {
+                            downloadTrack(track);
+                          }
+                        }}
+                        disabled={isDownloading === track.id}
+                      >
+                        {isDownloading === track.id ? (
+                          <Loader size={16} className="animate-spin" />
+                        ) : downloadedTracks.has(track.id) ? (
+                          <div className="relative">
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                          </div>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        )}
+                      </button>
+
+                      <button
+                        className="p-2 text-gray-500 hover:text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          hapticFeedback.selection();
+                          setTrackToAction(track);
+                          setShowActionModal(true);
+                        }}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Load More Button */}
+            {searchState.results.length > 0 && searchState.hasMore && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={loadMore}
+                  disabled={isLoadingMore}
+                  className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <Loader size={14} className="animate-spin" />
+                      <span>Загрузка...</span>
+                    </>
+                  ) : (
+                    <span>Показать еще</span>
+                  )}
+                </button>
               </div>
             )}
-
-            {displayTracks.map((track) => {
-              const isCurrent = currentTrack?.id === track.id;
-              return (
-                <div
-                  key={track.id}
-                  className={`flex items-center p-3 rounded-xl transition-all cursor-pointer ${isCurrent ? 'bg-white/10 border border-white/5' : 'hover:bg-white/5'
-                    }`}
-                  onClick={() => handlePlay(track)}
-                >
-                  <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 mr-4 group">
-                    <img
-                      src={track.coverUrl}
-                      alt={track.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        // Fallback image on error
-                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(track.artist)}&size=200&background=random`;
-                      }}
-                    />
-                    <div className={`absolute inset-0 bg-black/40 flex items-center justify-center ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                      }`}>
-                      {isCurrent && isPlaying ? (
-                        <div className="flex space-x-[2px] items-end h-4">
-                          <div className="w-[3px] bg-blue-400 animate-bounce h-2"></div>
-                          <div className="w-[3px] bg-blue-400 animate-bounce h-4 delay-75"></div>
-                          <div className="w-[3px] bg-blue-400 animate-bounce h-3 delay-150"></div>
-                        </div>
-                      ) : (
-                        <Play size={16} fill="white" />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <h4 className={`text-sm font-medium truncate ${isCurrent ? 'text-blue-400' : 'text-white'
-                      }`}>
-                      {track.title}
-                    </h4>
-                    <p className="text-xs text-gray-400 truncate">{track.artist}</p>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    {/* Download Button */}
-                    <button
-                      className={`p-2 transition-colors ${downloadedTracks.has(track.id)
-                        ? 'text-blue-400'
-                        : isDownloading === track.id
-                          ? 'text-blue-400 animate-pulse'
-                          : 'text-gray-500 hover:text-white'
-                        }`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (downloadedTracks.has(track.id)) {
-                          // TODO: Confirm removal
-                          // removeDownloadedTrack(track.id);
-                        } else {
-                          downloadTrack(track);
-                        }
-                      }}
-                      disabled={isDownloading === track.id}
-                    >
-                      {isDownloading === track.id ? (
-                        <Loader size={16} className="animate-spin" />
-                      ) : downloadedTracks.has(track.id) ? (
-                        <div className="relative">
-                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        </div>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                      )}
-                    </button>
-
-                    <button
-                      className="p-2 text-gray-500 hover:text-white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        hapticFeedback.selection();
-                        setTrackToAction(track);
-                        setShowActionModal(true);
-                      }}
-                    >
-                      <MoreVertical size={16} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
           </div>
-
-          {/* Load More Button */}
-          {searchState.results.length > 0 && searchState.hasMore && (
-            <div className="mt-6 flex justify-center">
-              <button
-                onClick={loadMore}
-                disabled={isLoadingMore}
-                className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
-              >
-                {isLoadingMore ? (
-                  <>
-                    <Loader size={14} className="animate-spin" />
-                    <span>Загрузка...</span>
-                  </>
-                ) : (
-                  <span>Показать еще</span>
-                )}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+        )
+      }
 
       {/* Action Modal (Add to Playlist) */}
-      {showActionModal && trackToAction && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in" onClick={() => setShowActionModal(false)}>
-          <div className="bg-gray-900 w-full max-w-sm p-6 rounded-t-2xl sm:rounded-2xl border-t sm:border border-white/10 shadow-2xl transform transition-transform" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-4 text-white">Добавить в плейлист</h3>
+      {
+        showActionModal && trackToAction && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in" onClick={() => setShowActionModal(false)}>
+            <div className="bg-gray-900 w-full max-w-sm p-6 rounded-t-2xl sm:rounded-2xl border-t sm:border border-white/10 shadow-2xl transform transition-transform" onClick={e => e.stopPropagation()}>
+              <h3 className="text-lg font-bold mb-4 text-white">Добавить в плейлист</h3>
 
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {playlists.length === 0 ? (
-                <div className="text-center text-gray-500 py-4">
-                  Нет плейлистов. Создайте первый!
-                </div>
-              ) : (
-                playlists.map(playlist => (
-                  <button
-                    key={playlist.id}
-                    className="w-full flex items-center p-3 rounded-xl hover:bg-white/5 transition-colors text-left"
-                    onClick={() => {
-                      addToPlaylist(playlist.id, trackToAction);
-                      setShowActionModal(false);
-                      setTrackToAction(null);
-                      hapticFeedback.success();
-                    }}
-                  >
-                    <div className="w-10 h-10 rounded-lg overflow-hidden mr-3">
-                      <img src={playlist.coverUrl} alt={playlist.name} className="w-full h-full object-cover" />
-                    </div>
-                    <span className="text-white font-medium">{playlist.name}</span>
-                  </button>
-                ))
-              )}
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {playlists.length === 0 ? (
+                  <div className="text-center text-gray-500 py-4">
+                    Нет плейлистов. Создайте первый!
+                  </div>
+                ) : (
+                  playlists.map(playlist => (
+                    <button
+                      key={playlist.id}
+                      className="w-full flex items-center p-3 rounded-xl hover:bg-white/5 transition-colors text-left"
+                      onClick={() => {
+                        addToPlaylist(playlist.id, trackToAction);
+                        setShowActionModal(false);
+                        setTrackToAction(null);
+                        hapticFeedback.success();
+                      }}
+                    >
+                      <div className="w-10 h-10 rounded-lg overflow-hidden mr-3">
+                        <img src={playlist.coverUrl} alt={playlist.name} className="w-full h-full object-cover" />
+                      </div>
+                      <span className="text-white font-medium">{playlist.name}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+
+              <button
+                className="w-full mt-4 py-3 bg-gray-800 rounded-xl font-medium text-gray-300 hover:bg-gray-700 transition-colors"
+                onClick={() => setShowActionModal(false)}
+              >
+                Отмена
+              </button>
             </div>
-
-            <button
-              className="w-full mt-4 py-3 bg-gray-800 rounded-xl font-medium text-gray-300 hover:bg-gray-700 transition-colors"
-              onClick={() => setShowActionModal(false)}
-            >
-              Отмена
-            </button>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 };
 

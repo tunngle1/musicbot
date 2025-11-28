@@ -333,6 +333,62 @@ class HitmoParser:
                 'genre': 'Юмор',
                 'url': 'https://pub0302.101.ru:8443/stream/reg/aac/64/102',
                 'image': 'https://cdn-radiotime-logos.tunein.com/s6888q.png'
+            },
+            {
+                'id': 'radio_nashe',
+                'name': 'Наше Радио',
+                'genre': 'Рок',
+                'url': 'https://nashe1.hostingradio.ru/nashe-128.mp3',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6889q.png'
+            },
+            {
+                'id': 'radio_love',
+                'name': 'Love Radio',
+                'genre': 'Поп',
+                'url': 'https://loveradio.hostingradio.ru/loveradio96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6890q.png'
+            },
+            {
+                'id': 'radio_avto',
+                'name': 'Авторадио',
+                'genre': 'Поп',
+                'url': 'https://pub0302.101.ru:8443/stream/air/aac/64/100',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6891q.png'
+            },
+            {
+                'id': 'radio_humor',
+                'name': 'Юмор FM',
+                'genre': 'Юмор',
+                'url': 'https://pub0302.101.ru:8443/stream/air/aac/64/104',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6892q.png'
+            },
+            {
+                'id': 'radio_7',
+                'name': 'Радио 7',
+                'genre': 'Поп',
+                'url': 'https://radio7.hostingradio.ru/radio7_96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6893q.png'
+            },
+            {
+                'id': 'radio_road',
+                'name': 'Дорожное',
+                'genre': 'Шансон',
+                'url': 'https://dorognoe.hostingradio.ru/dorognoe96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6894q.png'
+            },
+            {
+                'id': 'radio_vesti',
+                'name': 'Вести FM',
+                'genre': 'Новости',
+                'url': 'https://icecast-vgtrk.cdnvideo.ru/vestifm_mp3_128kbps',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6895q.png'
+            },
+            {
+                'id': 'radio_mayak',
+                'name': 'Маяк',
+                'genre': 'Разговорное',
+                'url': 'https://icecast-vgtrk.cdnvideo.ru/mayakfm_mp3_128kbps',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6896q.png'
             }
         ]
         

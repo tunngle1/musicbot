@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect, ReactNode } from 'react';
-import { Track, Playlist, RepeatMode, RadioStation } from '../types';
+import { Track, Playlist, RepeatMode, RadioStation, User } from '../types';
 import { MOCK_TRACKS, INITIAL_PLAYLISTS } from '../constants';
 
 interface PlayerContextType {
@@ -53,6 +53,8 @@ interface PlayerContextType {
     genreId: number | null;
   }>>;
   resetSearch: () => void;
+  // User State
+  user: User | null;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -67,6 +69,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isRadioMode, setIsRadioMode] = useState(false);
   const [queue, setQueue] = useState<Track[]>(MOCK_TRACKS);
   const [downloadedTracks, setDownloadedTracks] = useState<Set<string>>(new Set());
+  const [user, setUser] = useState<User | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -102,43 +105,61 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Загрузка скачанных треков и плейлистов при старте
+  // Auth and Load Data
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        console.log("Loading data from storage...");
-
-        // Загрузка треков
+    const init = async () => {
+      // 1. Auth User
+      if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+        const tgUser = window.Telegram.WebApp.initDataUnsafe.user;
         try {
-          const tracks = await storage.getAllTracks();
-          const ids = new Set(tracks.map(t => t.id));
-          setDownloadedTracks(ids);
-          console.log(`Loaded ${tracks.length} tracks`);
-        } catch (e) {
-          console.error("Failed to load tracks:", e);
-        }
-
-        // Загрузка плейлистов
-        try {
-          const savedPlaylists = await storage.getAllPlaylists();
-          console.log(`Loaded ${savedPlaylists.length} playlists`);
-
-          if (savedPlaylists.length > 0) {
-            setPlaylists(prev => {
-              // Объединяем дефолтные и сохраненные, избегая дубликатов по ID
-              const defaultIds = new Set(INITIAL_PLAYLISTS.map(p => p.id));
-              const newPlaylists = savedPlaylists.filter(p => !defaultIds.has(p.id));
-              return [...INITIAL_PLAYLISTS, ...newPlaylists];
-            });
+          const response = await fetch('http://localhost:8000/api/user/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: tgUser.id,
+              username: tgUser.username,
+              first_name: tgUser.first_name,
+              last_name: tgUser.last_name
+            })
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setUser(data.user);
           }
         } catch (e) {
-          console.error("Failed to load playlists:", e);
+          console.error("Auth failed:", e);
+          // Fallback for dev/testing if needed
+          if (tgUser.id === 414153884) {
+            setUser({ id: 414153884, is_admin: true, is_premium: true });
+          }
+        }
+      } else {
+        // Dev fallback
+        // setUser({ id: 414153884, is_admin: true, is_premium: true });
+      }
+
+      // 2. Load Data
+      try {
+        console.log("Loading data from storage...");
+        // ... existing loading logic ...
+        const tracks = await storage.getAllTracks();
+        const ids = new Set(tracks.map(t => t.id));
+        setDownloadedTracks(ids);
+
+        const savedPlaylists = await storage.getAllPlaylists();
+        if (savedPlaylists.length > 0) {
+          setPlaylists(prev => {
+            const defaultIds = new Set(INITIAL_PLAYLISTS.map(p => p.id));
+            const newPlaylists = savedPlaylists.filter(p => !defaultIds.has(p.id));
+            return [...INITIAL_PLAYLISTS, ...newPlaylists];
+          });
         }
       } catch (e) {
-        console.error("Critical error loading data:", e);
+        console.error("Failed to load data:", e);
       }
     };
-    loadData();
+
+    init();
   }, []);
 
   // Инициализация аудио элемента

@@ -11,6 +11,8 @@ const LibraryView: React.FC = () => {
   const [storageInfo, setStorageInfo] = useState<{
     usedMB: string;
     quotaMB: string;
+    remainingMB: number;
+    estimatedTracks: number;
     isPersisted: boolean;
   } | null>(null);
 
@@ -34,10 +36,18 @@ const LibraryView: React.FC = () => {
 
       if (navigator.storage && navigator.storage.estimate) {
         const estimate = await navigator.storage.estimate();
-        const usedMB = ((estimate.usage || 0) / 1024 / 1024).toFixed(2);
-        const quotaMB = ((estimate.quota || 0) / 1024 / 1024).toFixed(2);
+        const usedBytes = estimate.usage || 0;
+        const quotaBytes = estimate.quota || 0;
+        const remainingBytes = quotaBytes - usedBytes;
 
-        setStorageInfo({ usedMB, quotaMB, isPersisted });
+        const usedMB = (usedBytes / 1024 / 1024).toFixed(2);
+        const quotaMB = (quotaBytes / 1024 / 1024).toFixed(2);
+        const remainingMB = remainingBytes / 1024 / 1024;
+
+        // Average track size ~8MB
+        const estimatedTracks = Math.floor(remainingMB / 8);
+
+        setStorageInfo({ usedMB, quotaMB, remainingMB, estimatedTracks, isPersisted });
       }
     } catch (error) {
       console.error('Error loading storage info:', error);
@@ -97,10 +107,13 @@ const LibraryView: React.FC = () => {
               <p className="text-xs text-gray-400">
                 Использовано: {storageInfo.usedMB} МБ / {storageInfo.quotaMB} МБ
               </p>
+              <p className="text-xs text-blue-400 mt-1 font-medium">
+                Можно скачать еще ~{storageInfo.estimatedTracks} треков
+              </p>
             </div>
             <div className={`px-2 py-1 rounded-full text-xs font-medium ${storageInfo.isPersisted
-                ? 'bg-green-500/20 text-green-400'
-                : 'bg-yellow-500/20 text-yellow-400'
+              ? 'bg-green-500/20 text-green-400'
+              : 'bg-yellow-500/20 text-yellow-400'
               }`}>
               {storageInfo.isPersisted ? '🔒 Защищено' : '⚠️ Не защищено'}
             </div>

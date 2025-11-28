@@ -23,12 +23,21 @@ export interface RadioStation {
   image: string;
 }
 
+export interface User {
+  id: number;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  is_admin: boolean;
+  is_premium: boolean;
+}
+
 export enum ViewState {
-  HOME = 'HOME',
-  PLAYLISTS = 'PLAYLISTS',
-  LIBRARY = 'LIBRARY',
-  PLAYLIST_DETAILS = 'PLAYLIST_DETAILS'
+  HOME = 'home',
+  PLAYLISTS = 'playlists',
+  LIBRARY = 'library',
+  PLAYLIST_DETAILS = 'PLAYLIST_DETAILS',
+  ADMIN = 'admin'
 }
 
 export type RepeatMode = 'none' | 'all' | 'one';
-

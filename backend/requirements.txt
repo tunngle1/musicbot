@@ -8,3 +8,4 @@ selenium
 webdriver-manager
 httpx
 beautifulsoup4==4.0.1
+sqlalchemy==2.0.23

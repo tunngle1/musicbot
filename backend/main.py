@@ -2,16 +2,22 @@
 FastAPI Backend for Telegram Music Mini App
 """
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uvicorn
+from sqlalchemy.orm import Session
+from datetime import datetime
 
 try:
     from backend.hitmo_parser_light import HitmoParser
+    from backend.database import User, get_db, init_db
+    from backend.cache import make_cache_key, get_from_cache, set_to_cache, get_cache_stats, reset_cache
 except ImportError:
     from hitmo_parser_light import HitmoParser
+    from database import User, get_db, init_db
+    from cache import make_cache_key, get_from_cache, set_to_cache, get_cache_stats, reset_cache
 
 
 # Pydantic модели
@@ -23,11 +29,9 @@ class Track(BaseModel):
     url: str
     image: str
 
-
 class SearchResponse(BaseModel):
     results: List[Track]
     count: int
-
 
 class RadioStation(BaseModel):
     id: str
@@ -35,6 +39,31 @@ class RadioStation(BaseModel):
     genre: str
     url: str
     image: str
+
+class UserAuth(BaseModel):
+    id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
+class UserStats(BaseModel):
+    total_users: int
+    premium_users: int
+    admin_users: int
+    new_users_today: int
+
+class GrantRequest(BaseModel):
+    user_id: int
+    is_admin: Optional[bool] = None
+    is_premium: Optional[bool] = None
+
+class CacheStats(BaseModel):
+    total_entries: int
+    cache_hits: int
+    cache_misses: int
+    hit_ratio: float
+    ttl_seconds: int
+    sample_keys: List[str]
 
 
 # Инициализация FastAPI
@@ -56,6 +85,10 @@ app.add_middleware(
 # Глобальный экземпляр парсера
 parser = HitmoParser()
 
+@app.on_event("startup")
+async def startup_event():
+    """Инициализация БД при старте"""
+    init_db()
 
 @app.get("/")
 async def root():
@@ -75,6 +108,107 @@ async def health_check():
         "service": "telegram-music-api"
     }
 
+# --- User & Admin Endpoints ---
+
+@app.post("/api/user/auth")
+async def auth_user(user_data: UserAuth, db: Session = Depends(get_db)):
+    """Регистрация или обновление данных пользователя"""
+    user = db.query(User).filter(User.id == user_data.id).first()
+    if not user:
+        user = User(
+            id=user_data.id,
+            username=user_data.username,
+            first_name=user_data.first_name,
+            last_name=user_data.last_name
+        )
+        db.add(user)
+    else:
+        # Обновляем данные если изменились
+        user.username = user_data.username
+        user.first_name = user_data.first_name
+        user.last_name = user_data.last_name
+    
+    db.commit()
+    db.refresh(user)
+    return {
+        "status": "ok",
+        "user": {
+            "id": user.id,
+            "is_admin": user.is_admin,
+            "is_premium": user.is_premium
+        }
+    }
+
+@app.get("/api/admin/stats", response_model=UserStats)
+async def get_stats(user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Получение статистики (только для админов)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    total = db.query(User).count()
+    premium = db.query(User).filter(User.is_premium == True).count()
+    admins = db.query(User).filter(User.is_admin == True).count()
+    
+    today = datetime.utcnow().date()
+    new_today = db.query(User).filter(User.joined_at >= today).count()
+    
+    return UserStats(
+        total_users=total,
+        premium_users=premium,
+        admin_users=admins,
+        new_users_today=new_today
+    )
+
+@app.post("/api/admin/grant")
+async def grant_rights(
+    request: GrantRequest, 
+    admin_id: int = Query(..., description="ID администратора"),
+    db: Session = Depends(get_db)
+):
+    """Выдача прав (только для админов)"""
+    admin = db.query(User).filter(User.id == admin_id).first()
+    if not admin or not admin.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    target_user = db.query(User).filter(User.id == request.user_id).first()
+    if not target_user:
+        # Если пользователя нет, создаем заглушку (чтобы можно было выдать права заранее)
+        target_user = User(id=request.user_id)
+        db.add(target_user)
+    
+    if request.is_admin is not None:
+        target_user.is_admin = request.is_admin
+    
+    if request.is_premium is not None:
+        target_user.is_premium = request.is_premium
+        
+    db.commit()
+    return {"status": "ok", "message": f"Rights updated for user {request.user_id}"}
+
+# --- Cache Admin Endpoints ---
+
+@app.get("/api/admin/cache/stats", response_model=CacheStats)
+async def get_admin_cache_stats(user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Получение статистики кэша (только для админов)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    return get_cache_stats()
+
+@app.post("/api/admin/cache/reset")
+async def reset_admin_cache(admin_id: int = Query(...), db: Session = Depends(get_db)):
+    """Сброс кэша (только для админов)"""
+    user = db.query(User).filter(User.id == admin_id).first()
+    if not user or not user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    reset_cache()
+    return {"status": "ok", "message": "Cache cleared"}
+
+
+# --- Music Endpoints ---
 
 @app.get("/api/search", response_model=SearchResponse)
 async def search_tracks(
@@ -84,19 +218,28 @@ async def search_tracks(
     by_artist: bool = Query(False, description="Искать только по исполнителю")
 ):
     """
-    Поиск треков по запросу
-    
-    Args:
-        q: Поисковый запрос (название трека, исполнитель)
-        limit: Максимальное количество результатов (1-50)
-        page: Номер страницы
-        by_artist: Если True, фильтрует результаты, оставляя только совпадения по исполнителю
-        
-    Returns:
-        Список найденных треков
+    Поиск треков по запросу (с кэшированием)
     """
     try:
-        # Выполняем поиск (синхронно, Selenium)
+        # 1. Проверяем кэш
+        cache_key = make_cache_key("search", {
+            "q": q, 
+            "limit": limit, 
+            "page": page, 
+            "by_artist": by_artist
+        })
+        
+        cached_data = get_from_cache(cache_key)
+        if cached_data:
+            # Возвращаем данные из кэша, но нужно преобразовать словари обратно в объекты Track
+            # так как в кэше мы храним сериализованные данные (список словарей)
+            track_models = [Track(**t) for t in cached_data["results"]]
+            return SearchResponse(
+                results=track_models,
+                count=cached_data["count"]
+            )
+
+        # 2. Если нет в кэше, делаем запрос
         tracks = parser.search(q, limit=limit, page=page)
         
         # Фильтрация по артисту если запрошено
@@ -109,18 +252,29 @@ async def search_tracks(
         
         # Конвертируем в Pydantic модели и оборачиваем URL в прокси
         track_models = []
-        base_url = "" # Используем относительный путь, чтобы работало через прокси
+        base_url = "" 
+        
+        # Подготавливаем данные для кэша (чистые словари)
+        cacheable_results = []
         
         for track in tracks:
-            # Создаем прокси URL
             original_url = track['url']
             if original_url:
-                # Кодируем URL
                 from urllib.parse import quote
                 encoded_url = quote(original_url)
                 track['url'] = f"{base_url}/api/stream?url={encoded_url}"
             
-            track_models.append(Track(**track))
+            track_model = Track(**track)
+            track_models.append(track_model)
+            cacheable_results.append(track_model.dict())
+        
+        response_data = {
+            "results": cacheable_results,
+            "count": len(cacheable_results)
+        }
+        
+        # 3. Сохраняем в кэш
+        set_to_cache(cache_key, response_data)
         
         return SearchResponse(
             results=track_models,
@@ -138,15 +292,7 @@ async def search_tracks(
 async def get_track(track_id: str):
     """
     Получение информации о конкретном треке
-    
-    Args:
-        track_id: ID трека
-        
-    Returns:
-        Информация о треке
     """
-    # Примечание: Hitmo не предоставляет прямой доступ к треку по ID
-    # Этот endpoint можно расширить при необходимости
     raise HTTPException(
         status_code=501,
         detail="Получение трека по ID пока не реализовано. Используйте поиск."
@@ -156,16 +302,32 @@ async def get_track(track_id: str):
 @app.get("/api/radio")
 async def get_radio_stations():
     """
-    Получение списка радиостанций
-    
-    Returns:
-        Список доступных радиостанций
+    Получение списка радиостанций (с кэшированием)
     """
     try:
+        # 1. Проверяем кэш
+        cache_key = make_cache_key("radio", {})
+        cached_data = get_from_cache(cache_key)
+        
+        if cached_data:
+            station_models = [RadioStation(**s) for s in cached_data["results"]]
+            return {
+                "results": station_models,
+                "count": cached_data["count"]
+            }
+
+        # 2. Запрос
         stations = parser.get_radio_stations()
         
         # Конвертируем в Pydantic модели
         station_models = [RadioStation(**station) for station in stations]
+        
+        # 3. Сохраняем в кэш
+        cacheable_data = {
+            "results": [s.dict() for s in station_models],
+            "count": len(station_models)
+        }
+        set_to_cache(cache_key, cacheable_data)
         
         return {
             "results": station_models,
@@ -186,22 +348,31 @@ async def get_genre_tracks(
     page: int = Query(1, description="Номер страницы", ge=1)
 ):
     """
-    Получение треков конкретного жанра
-    
-    Args:
-        genre_id: ID жанра на Hitmo (например, 2 для Поп, 6 для Рок)
-        limit: Максимальное количество результатов (1-50)
-        page: Номер страницы
-        
-    Returns:
-        Список треков жанра
+    Получение треков конкретного жанра (с кэшированием)
     """
     try:
+        # 1. Проверяем кэш
+        cache_key = make_cache_key("genre", {
+            "genre_id": genre_id,
+            "limit": limit,
+            "page": page
+        })
+        
+        cached_data = get_from_cache(cache_key)
+        if cached_data:
+            track_models = [Track(**t) for t in cached_data["results"]]
+            return {
+                "results": track_models,
+                "count": cached_data["count"],
+                "genre_id": genre_id
+            }
+
+        # 2. Запрос
         tracks = parser.get_genre_tracks(genre_id, limit=limit, page=page)
         
-        # Конвертируем в Pydantic модели и оборачиваем URL в прокси
         track_models = []
         base_url = ""
+        cacheable_results = []
         
         for track in tracks:
             original_url = track['url']
@@ -210,7 +381,16 @@ async def get_genre_tracks(
                 encoded_url = quote(original_url)
                 track['url'] = f"{base_url}/api/stream?url={encoded_url}"
             
-            track_models.append(Track(**track))
+            track_model = Track(**track)
+            track_models.append(track_model)
+            cacheable_results.append(track_model.dict())
+        
+        # 3. Сохраняем в кэш
+        response_data = {
+            "results": cacheable_results,
+            "count": len(cacheable_results)
+        }
+        set_to_cache(cache_key, response_data)
         
         return {
             "results": track_models,

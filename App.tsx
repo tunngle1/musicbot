@@ -7,12 +7,13 @@ import FullPlayer from './components/FullPlayer';
 import HomeView from './views/HomeView';
 import PlaylistsView from './views/PlaylistsView';
 import LibraryView from './views/LibraryView';
+import AdminView from './views/AdminView';
 import { initTelegramWebApp } from './utils/telegram';
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.HOME);
   const [isFullPlayerOpen, setIsFullPlayerOpen] = useState(false);
-  const { currentTrack, resetSearch } = usePlayer();
+  const { currentTrack, resetSearch, user } = usePlayer();
 
   const handleNavigate = (view: ViewState) => {
     if (view === ViewState.HOME && currentView === ViewState.HOME) {
@@ -76,6 +77,8 @@ const AppContent: React.FC = () => {
         return <PlaylistsView />;
       case ViewState.LIBRARY:
         return <LibraryView />;
+      case ViewState.ADMIN:
+        return <AdminView onBack={() => setCurrentView(ViewState.HOME)} />;
       default:
         return <HomeView />;
     }
@@ -96,6 +99,16 @@ const AppContent: React.FC = () => {
         )}
         <BottomNav currentView={currentView} onNavigate={handleNavigate} />
       </div>
+
+      {/* Admin Button (Only for Admins) */}
+      {user?.is_admin && currentView !== ViewState.ADMIN && (
+        <button
+          onClick={() => setCurrentView(ViewState.ADMIN)}
+          className="fixed top-4 right-4 z-40 p-2 bg-blue-600/20 text-blue-400 rounded-full backdrop-blur-md border border-blue-500/30 hover:bg-blue-600/30 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        </button>
+      )}
 
       {/* Full Screen Player Modal */}
       {isFullPlayerOpen && (
