@@ -147,12 +147,16 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
     const handleLoadedMetadata = () => setDuration(audio.duration);
     const handleEnded = () => {
-      if (repeatMode === 'one') {
-        audio.currentTime = 0;
-        audio.play();
-      } else {
-        nextTrack();
-      }
+      // Use current repeatMode value from state
+      setRepeatMode(currentRepeatMode => {
+        if (currentRepeatMode === 'one') {
+          audio.currentTime = 0;
+          audio.play();
+        } else {
+          nextTrack();
+        }
+        return currentRepeatMode; // Don't change the mode
+      });
     };
     const handleError = (e: Event) => {
       console.error("Audio error:", e);
@@ -173,7 +177,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       audio.src = '';
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [repeatMode]);
+  }, []); // Remove repeatMode from dependencies!
 
   // Управление воспроизведением при смене трека
   useEffect(() => {
