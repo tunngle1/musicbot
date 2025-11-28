@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Plus, Music, ChevronLeft, Play, Trash2, MoreVertical } from 'lucide-react';
+import { Plus, Music, ChevronLeft, Play, Trash2, MoreVertical, Loader } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { Playlist, Track } from '../types';
 
 const PlaylistsView: React.FC = () => {
-  const { playlists, createPlaylist, deletePlaylist, updatePlaylist, removeFromPlaylist, allTracks, playTrack, currentTrack, isPlaying, togglePlay } = usePlayer();
+  const { playlists, createPlaylist, deletePlaylist, updatePlaylist, removeFromPlaylist, allTracks, playTrack, currentTrack, isPlaying, togglePlay, downloadTrack, downloadedTracks, isDownloading } = usePlayer();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
@@ -167,7 +167,7 @@ const PlaylistsView: React.FC = () => {
 
         {/* Rename Modal */}
         {showRenameModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+          <div className="fixed inset-0 z-[100] flex items-start justify-center pt-20 sm:items-center sm:pt-0 bg-black/80 backdrop-blur-sm px-4">
             <div className="bg-gray-800 w-full max-w-sm p-6 rounded-2xl border border-white/10">
               <h3 className="text-lg font-bold mb-4">Переименовать</h3>
               <input
@@ -261,22 +261,54 @@ const PlaylistsView: React.FC = () => {
                     <p className="text-xs text-gray-400 truncate">{track.artist}</p>
                   </div>
 
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm('Удалить трек из плейлиста?')) {
-                        removeFromPlaylist(selectedPlaylist.id, track.id);
-                        // Update local state to reflect removal immediately
-                        setSelectedPlaylist(prev => prev ? ({
-                          ...prev,
-                          trackIds: prev.trackIds.filter(id => id !== track.id)
-                        }) : null);
-                      }
-                    }}
-                    className="p-2 text-gray-500 hover:text-red-400"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    {/* Download Button */}
+                    <button
+                      className={`p-2 transition-colors ${downloadedTracks.has(track.id)
+                        ? 'text-blue-400'
+                        : isDownloading === track.id
+                          ? 'text-blue-400 animate-pulse'
+                          : 'text-gray-500 hover:text-white'
+                        }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (downloadedTracks.has(track.id)) {
+                          // Optional: Confirm removal
+                        } else {
+                          downloadTrack(track);
+                        }
+                      }}
+                      disabled={isDownloading === track.id}
+                    >
+                      {isDownloading === track.id ? (
+                        <Loader size={16} className="animate-spin" />
+                      ) : downloadedTracks.has(track.id) ? (
+                        <div className="relative">
+                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        </div>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('Удалить трек из плейлиста?')) {
+                          removeFromPlaylist(selectedPlaylist.id, track.id);
+                          // Update local state to reflect removal immediately
+                          setSelectedPlaylist(prev => prev ? ({
+                            ...prev,
+                            trackIds: prev.trackIds.filter(id => id !== track.id)
+                          }) : null);
+                        }
+                      }}
+                      className="p-2 text-gray-500 hover:text-red-400"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
                 </div>
               );
             })
@@ -333,13 +365,13 @@ const PlaylistsView: React.FC = () => {
 
       {/* Simple Modal for Creation */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-12 sm:items-center sm:pt-0 bg-black/80 backdrop-blur-sm px-4 animate-fade-in">
           <div className="bg-gray-800 w-full max-w-sm p-6 rounded-2xl border border-white/10 shadow-2xl transform transition-all scale-100">
-            <h3 className="text-lg font-bold mb-4">Новый плейлист</h3>
+            <h3 className="text-lg font-bold mb-4 text-center">Новый плейлист</h3>
 
             {/* Cover Upload */}
             <div
-              className="w-full aspect-square bg-gray-900 rounded-xl mb-4 border-2 border-dashed border-gray-700 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors overflow-hidden relative group"
+              className="w-40 h-40 mx-auto bg-gray-900 rounded-xl mb-6 border-2 border-dashed border-gray-700 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors overflow-hidden relative group"
               onClick={() => fileInputRef.current?.click()}
             >
               {coverPreview ? (
