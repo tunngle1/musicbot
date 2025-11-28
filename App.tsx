@@ -86,9 +86,12 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="relative min-h-screen bg-black text-white pb-24 overflow-x-hidden">
+      {/* Background Gradient */}
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/40 via-black to-black z-0 pointer-events-none" />
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent z-0 pointer-events-none" />
 
       {/* Main Content Area */}
-      <main className="w-full max-w-md mx-auto min-h-screen relative">
+      <main className="w-full max-w-md mx-auto min-h-screen relative z-10">
         {renderView()}
       </main>
 
@@ -104,7 +107,7 @@ const AppContent: React.FC = () => {
       {user?.is_admin && currentView !== ViewState.ADMIN && (
         <button
           onClick={() => setCurrentView(ViewState.ADMIN)}
-          className="fixed top-4 right-4 z-40 p-2 bg-blue-600/20 text-blue-400 rounded-full backdrop-blur-md border border-blue-500/30 hover:bg-blue-600/30 transition-colors"
+          className="fixed top-4 right-4 z-40 p-2 glass-button text-blue-400 rounded-full hover:text-blue-300"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
         </button>

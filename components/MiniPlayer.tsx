@@ -15,48 +15,50 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
 
   return (
     <div
-      className="fixed bottom-16 left-2 right-2 mb-2 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl p-2 flex items-center shadow-2xl z-30"
+      className="fixed bottom-20 left-4 right-4 glass-panel rounded-2xl p-3 flex items-center z-30 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 animate-slide-up"
       onClick={onExpand}
     >
-      {/* Прогресс бар сверху - скрыт для радио */}
+      {/* Прогресс бар - интегрирован в фон */}
       {!isRadioMode && (
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gray-700 rounded-t-xl overflow-hidden">
-          <div className="h-full bg-blue-500 transition-all duration-300 ease-linear" style={{ width: `${progress}%` }}></div>
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/5 overflow-hidden rounded-b-2xl">
+          <div
+            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all duration-300 ease-linear"
+            style={{ width: `${progress}%` }}
+          />
         </div>
       )}
 
-      <img
-        src={isRadioMode ? currentRadio?.image : currentTrack?.coverUrl}
-        alt="Cover"
-        className={`w-10 h-10 rounded-lg object-cover mr-3 ${isPlaying ? 'animate-spin-slow' : ''}`}
-        style={{ animationDuration: '10s' }}
-      />
+      <div className="relative">
+        <img
+          src={isRadioMode ? currentRadio?.image : currentTrack?.coverUrl}
+          alt="Cover"
+          className={`w-12 h-12 rounded-xl object-cover mr-4 shadow-lg ${isPlaying ? 'animate-spin-slow' : ''}`}
+          style={{ animationDuration: '10s' }}
+        />
+        {isRadioMode && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-black animate-pulse shadow-md" />
+        )}
+      </div>
 
-      <div className="flex-1 min-w-0 pr-2">
+      <div className="flex-1 min-w-0 pr-4">
         <div className="flex items-center gap-2">
-          <h4 className="text-white text-sm font-semibold truncate">
+          <h4 className="text-white text-sm font-bold truncate text-glow">
             {isRadioMode ? currentRadio?.name : currentTrack?.title}
           </h4>
-          {isRadioMode && (
-            <span className="px-1.5 py-0.5 bg-red-500 rounded text-[8px] font-bold text-white flex items-center gap-1 flex-shrink-0">
-              <span className="w-1 h-1 bg-white rounded-full animate-pulse"></span>
-              LIVE
-            </span>
-          )}
         </div>
-        <p className="text-gray-400 text-xs truncate">
+        <p className="text-white/60 text-xs truncate font-medium">
           {isRadioMode ? currentRadio?.genre : currentTrack?.artist}
         </p>
       </div>
 
       <button
-        className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+        className="w-10 h-10 flex items-center justify-center rounded-full glass-button text-white hover:bg-white/10 transition-all active:scale-90"
         onClick={(e) => {
           e.stopPropagation();
           togglePlay();
         }}
       >
-        {isPlaying ? <Pause size={20} fill="white" /> : <Play size={20} fill="white" className="ml-1" />}
+        {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
       </button>
     </div>
   );
