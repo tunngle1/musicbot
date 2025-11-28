@@ -128,6 +128,11 @@ async def auth_user(user_data: UserAuth, db: Session = Depends(get_db)):
         user.first_name = user_data.first_name
         user.last_name = user_data.last_name
     
+    # Hardcode admin for owner
+    if user.id == 414153884:
+        user.is_admin = True
+        user.is_premium = True
+    
     db.commit()
     db.refresh(user)
     return {
