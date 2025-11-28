@@ -251,144 +251,144 @@ class HitmoParser:
         # Popular Russian radio stations with direct stream URLs
         stations = [
             {
-                'id': 'radio_energy',
-                'name': 'Energy',
-                'genre': 'Хиты',
-                'url': 'https://pub0302.101.ru:8443/stream/air/aac/64/99',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s24939q.png'
-            },
-            {
-                'id': 'radio_europa_plus',
-                'name': 'Европа Плюс',
+                'id': 'rusradio',
+                'name': 'Русское Радио',
                 'genre': 'Поп',
-                'url': 'https://ep128.hostingradio.ru:8030/ep128',
-                'image': 'https://cdn-profiles.tunein.com/s8439/images/logog.png'
+                'url': 'https://rusradio.hostingradio.ru/rusradio96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6891q.png'
             },
             {
-                'id': 'radio_record',
-                'name': 'Radio Record',
-                'genre': 'Электроника',
-                'url': 'https://radiorecord.hostingradio.ru/rr_main96.aacp',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s25419q.png'
-            },
-            {
-                'id': 'radio_maximum',
-                'name': 'Maximum',
-                'genre': 'Рок',
-                'url': 'https://maximum.hostingradio.ru/maximum96.aacp',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6882q.png'
-            },
-            {
-                'id': 'radio_monte_carlo',
-                'name': 'Monte Carlo',
-                'genre': 'Релакс',
-                'url': 'https://montecarlo.hostingradio.ru/montecarlo96.aacp',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6883q.png'
-            },
-            {
-                'id': 'radio_dfm',
-                'name': 'DFM',
-                'genre': 'Танцевальная',
-                'url': 'https://dfm.hostingradio.ru/dfm96.aacp',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6881q.png'
-            },
-            {
-                'id': 'radio_retro',
-                'name': 'Ретро FM',
-                'genre': 'Ретро',
-                'url': 'https://retro.hostingradio.ru:8043/retro128',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6884q.png'
-            },
-            {
-                'id': 'radio_chanson',
-                'name': 'Шансон',
-                'genre': 'Шансон',
-                'url': 'https://chanson.hostingradio.ru:8041/chanson128.mp3',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6885q.png'
-            },
-            {
-                'id': 'radio_jazz',
-                'name': 'Jazz FM',
-                'genre': 'Джаз',
-                'url': 'https://nashe1.hostingradio.ru/jazz-128.mp3',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s25418q.png'
-            },
-            {
-                'id': 'radio_relax',
-                'name': 'Relax FM',
-                'genre': 'Релакс',
-                'url': 'https://relaxfm.hostingradio.ru/relax128.mp3',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6886q.png'
-            },
-            {
-                'id': 'radio_hits',
-                'name': 'Хит FM',
-                'genre': 'Хиты',
-                'url': 'https://hitfm.hostingradio.ru/hitfm96.aacp',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6887q.png'
-            },
-            {
-                'id': 'radio_comedy',
-                'name': 'Comedy Radio',
-                'genre': 'Юмор',
-                'url': 'https://pub0302.101.ru:8443/stream/reg/aac/64/102',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6888q.png'
-            },
-            {
-                'id': 'radio_nashe',
-                'name': 'Наше Радио',
-                'genre': 'Рок',
-                'url': 'https://nashe1.hostingradio.ru/nashe-128.mp3',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6889q.png'
-            },
-            {
-                'id': 'radio_love',
-                'name': 'Love Radio',
-                'genre': 'Поп',
-                'url': 'https://loveradio.hostingradio.ru/loveradio96.aacp',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6890q.png'
-            },
-            {
-                'id': 'radio_avto',
+                'id': 'avtoradio',
                 'name': 'Авторадио',
                 'genre': 'Поп',
                 'url': 'https://pub0302.101.ru:8443/stream/air/aac/64/100',
                 'image': 'https://cdn-radiotime-logos.tunein.com/s6891q.png'
             },
             {
-                'id': 'radio_humor',
-                'name': 'Юмор FM',
-                'genre': 'Юмор',
-                'url': 'https://pub0302.101.ru:8443/stream/air/aac/64/104',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6892q.png'
-            },
-            {
-                'id': 'radio_7',
-                'name': 'Радио 7',
+                'id': 'europaplus',
+                'name': 'Европа Плюс',
                 'genre': 'Поп',
-                'url': 'https://radio7.hostingradio.ru/radio7_96.aacp',
-                'image': 'https://cdn-radiotime-logos.tunein.com/s6893q.png'
+                'url': 'https://ep128.hostingradio.ru:8030/ep128',
+                'image': 'https://cdn-profiles.tunein.com/s8439/images/logog.png'
             },
             {
-                'id': 'radio_road',
-                'name': 'Дорожное',
+                'id': 'retrofm',
+                'name': 'Ретро FM',
+                'genre': 'Ретро',
+                'url': 'https://retro.hostingradio.ru:8043/retro128',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6884q.png'
+            },
+            {
+                'id': 'dorozhnoe',
+                'name': 'Дорожное Радио',
                 'genre': 'Шансон',
                 'url': 'https://dorognoe.hostingradio.ru/dorognoe96.aacp',
                 'image': 'https://cdn-radiotime-logos.tunein.com/s6894q.png'
             },
             {
-                'id': 'radio_vesti',
+                'id': 'vestifm',
                 'name': 'Вести FM',
                 'genre': 'Новости',
                 'url': 'https://icecast-vgtrk.cdnvideo.ru/vestifm_mp3_128kbps',
                 'image': 'https://cdn-radiotime-logos.tunein.com/s6895q.png'
             },
             {
-                'id': 'radio_mayak',
-                'name': 'Маяк',
+                'id': 'mayak',
+                'name': 'Радио Маяк',
                 'genre': 'Разговорное',
                 'url': 'https://icecast-vgtrk.cdnvideo.ru/mayakfm_mp3_128kbps',
                 'image': 'https://cdn-radiotime-logos.tunein.com/s6896q.png'
+            },
+            {
+                'id': 'radiovanya',
+                'name': 'Радио Ваня',
+                'genre': 'Поп',
+                'url': 'https://icecast-van.cdnvideo.ru/radio_vanya',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s102736q.png'
+            },
+            {
+                'id': 'radiorecord',
+                'name': 'Радио Рекорд',
+                'genre': 'Электроника',
+                'url': 'https://radiorecord.hostingradio.ru/rr_main96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s25419q.png'
+            },
+            {
+                'id': 'nashe',
+                'name': 'Наше Радио',
+                'genre': 'Рок',
+                'url': 'https://nashe1.hostingradio.ru/nashe-128.mp3',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6889q.png'
+            },
+            {
+                'id': 'dfm',
+                'name': 'DFM',
+                'genre': 'Танцевальная',
+                'url': 'https://dfm.hostingradio.ru/dfm96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6881q.png'
+            },
+            {
+                'id': 'hitfm',
+                'name': 'Хит FM',
+                'genre': 'Хиты',
+                'url': 'https://hitfm.hostingradio.ru/hitfm96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6887q.png'
+            },
+            {
+                'id': 'chanson',
+                'name': 'Радио Шансон',
+                'genre': 'Шансон',
+                'url': 'https://chanson.hostingradio.ru:8041/chanson128.mp3',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6885q.png'
+            },
+            {
+                'id': 'humorfm',
+                'name': 'Юмор FM',
+                'genre': 'Юмор',
+                'url': 'https://pub0302.101.ru:8443/stream/air/aac/64/104',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6892q.png'
+            },
+            {
+                'id': 'energy',
+                'name': 'Радио ENERGY',
+                'genre': 'Хиты',
+                'url': 'https://pub0302.101.ru:8443/stream/air/aac/64/99',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s24939q.png'
+            },
+            {
+                'id': 'radio7',
+                'name': 'Радио 7',
+                'genre': 'Поп',
+                'url': 'https://radio7.hostingradio.ru/radio7_96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6893q.png'
+            },
+            {
+                'id': 'newradio',
+                'name': 'Новое Радио',
+                'genre': 'Поп',
+                'url': 'https://icecast-newradio.cdnvideo.ru/newradio',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s268066q.png'
+            },
+            {
+                'id': 'montecarlo',
+                'name': 'Монте-Карло',
+                'genre': 'Релакс',
+                'url': 'https://montecarlo.hostingradio.ru/montecarlo96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6883q.png'
+            },
+            {
+                'id': 'relaxfm',
+                'name': 'Relax FM',
+                'genre': 'Релакс',
+                'url': 'https://relaxfm.hostingradio.ru/relax128.mp3',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6886q.png'
+            },
+            {
+                'id': 'radiorossii',
+                'name': 'Радио Россия',
+                'genre': 'Разговорное',
+                'url': 'https://icecast-vgtrk.cdnvideo.ru/rrzonam_mp3_192kbps',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6933q.png'
             }
         ]
         

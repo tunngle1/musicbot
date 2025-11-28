@@ -124,7 +124,10 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           });
           if (response.ok) {
             const data = await response.json();
+            console.log("Auth response:", data); // DEBUG LOG
             setUser(data.user);
+          } else {
+            console.error("Auth error:", await response.text());
           }
         } catch (e) {
           console.error("Auth failed:", e);
