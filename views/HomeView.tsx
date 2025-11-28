@@ -21,6 +21,7 @@ const HomeView: React.FC = () => {
 
   const [showActionModal, setShowActionModal] = useState(false);
   const [trackToAction, setTrackToAction] = useState<Track | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const { playlists, addToPlaylist } = usePlayer();
 
   // Отображаемые треки: результаты поиска или все треки
@@ -68,7 +69,13 @@ const HomeView: React.FC = () => {
     const nextPage = searchState.page + 1;
 
     try {
-      const newResults = await searchTracks(searchState.query, 20, nextPage, searchState.isArtistSearch);
+      let newResults: Track[] = [];
+      
+      if (searchState.genreId) {
+        newResults = await getGenreTracks(searchState.genreId, 20, nextPage);
+      } else {
+        newResults = await searchTracks(searchState.query, 20, nextPage, searchState.isArtistSearch);
+      }
 
       if (newResults.length === 0) {
         setSearchState(prev => ({ ...prev, hasMore: false }));
@@ -98,7 +105,7 @@ const HomeView: React.FC = () => {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
-    setSearchState(prev => ({ ...prev, query, isArtistSearch: false }));
+    setSearchState(prev => ({ ...prev, query, isArtistSearch: false, genreId: null }));
 
     if (query.trim().length > 2) {
       // Debounce search is handled by the useEffect above,
@@ -165,10 +172,10 @@ const HomeView: React.FC = () => {
                 key={genre.name}
                 onClick={async () => {
                   hapticFeedback.light();
-                  setSearchState(prev => ({ ...prev, isSearching: true, results: [] }));
+                  setSearchState(prev => ({ ...prev, isSearching: true, results: [], genreId: genre.genreId, page: 1 }));
 
                   try {
-                    const results = await getGenreTracks(genre.genreId, 20);
+                    const results = await getGenreTracks(genre.genreId, 20, 1);
                     setSearchState(prev => ({
                       ...prev,
                       results,
@@ -322,7 +329,7 @@ const HomeView: React.FC = () => {
         </div>
 
         {/* Load More Button */}
-        {searchState.query.trim() && searchState.hasMore && displayTracks.length > 0 && (
+        {searchState.results.length > 0 && searchState.hasMore && (
           <div className="mt-6 flex justify-center">
             <button
               onClick={loadMore}

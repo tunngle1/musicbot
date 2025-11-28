@@ -148,7 +148,8 @@ async def get_track(track_id: str):
 @app.get("/api/genre/{genre_id}")
 async def get_genre_tracks(
     genre_id: int,
-    limit: int = Query(20, description="Максимальное количество результатов", ge=1, le=50)
+    limit: int = Query(20, description="Максимальное количество результатов", ge=1, le=50),
+    page: int = Query(1, description="Номер страницы", ge=1)
 ):
     """
     Получение треков конкретного жанра
@@ -156,12 +157,13 @@ async def get_genre_tracks(
     Args:
         genre_id: ID жанра на Hitmo (например, 2 для Поп, 6 для Рок)
         limit: Максимальное количество результатов (1-50)
+        page: Номер страницы
         
     Returns:
         Список треков жанра
     """
     try:
-        tracks = parser.get_genre_tracks(genre_id, limit=limit)
+        tracks = parser.get_genre_tracks(genre_id, limit=limit, page=page)
         
         # Конвертируем в Pydantic модели и оборачиваем URL в прокси
         track_models = []

@@ -149,15 +149,18 @@ class HitmoParser:
         except:
             return None
     
-    def get_genre_tracks(self, genre_id: int, limit: int = 20) -> List[Dict]:
+    def get_genre_tracks(self, genre_id: int, limit: int = 20, page: int = 1) -> List[Dict]:
         """
         Get tracks from a specific genre
         """
         try:
             url = f"{self.BASE_URL}/genre/{genre_id}"
+            params = {
+                'start': (page - 1) * 48
+            }
             
             with httpx.Client(headers=self.headers, timeout=10.0, follow_redirects=True) as client:
-                response = client.get(url)
+                response = client.get(url, params=params)
                 response.raise_for_status()
                 
                 soup = BeautifulSoup(response.text, 'html.parser')

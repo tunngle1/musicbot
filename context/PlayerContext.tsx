@@ -39,6 +39,7 @@ interface PlayerContextType {
     page: number;
     hasMore: boolean;
     isArtistSearch: boolean;
+    genreId: number | null; // New field
   };
   setSearchState: React.Dispatch<React.SetStateAction<{
     query: string;
@@ -48,6 +49,7 @@ interface PlayerContextType {
     page: number;
     hasMore: boolean;
     isArtistSearch: boolean;
+    genreId: number | null;
   }>>;
   resetSearch: () => void;
 }
@@ -78,7 +80,8 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     error: null as string | null,
     page: 1,
     hasMore: true,
-    isArtistSearch: false
+    isArtistSearch: false,
+    genreId: null as number | null
   });
 
   const resetSearch = () => {
@@ -89,7 +92,8 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       error: null,
       page: 1,
       hasMore: true,
-      isArtistSearch: false
+      isArtistSearch: false,
+      genreId: null
     });
   };
 

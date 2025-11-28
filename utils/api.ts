@@ -82,11 +82,13 @@ export const searchTracks = async (
  */
 export const getGenreTracks = async (
     genreId: number,
-    limit: number = 20
+    limit: number = 20,
+    page: number = 1
 ): Promise<Track[]> => {
     try {
         const url = new URL(`${API_BASE_URL}/api/genre/${genreId}`);
         url.searchParams.append('limit', limit.toString());
+        url.searchParams.append('page', page.toString());
 
         const response = await fetch(url.toString(), {
             headers: {
