@@ -15,23 +15,9 @@ const HomeView: React.FC = () => {
     downloadedTracks,
     isDownloading,
     togglePlay,
-    const [searchState, setSearchState] = useState<{
-      query: string;
-      results: Track[];
-      isSearching: boolean;
-      error: string | null;
-      page: number;
-      hasMore: boolean;
-      isArtistSearch: boolean; // New flag
-    }>({
-      query: '',
-      results: [],
-      isSearching: false,
-      error: null,
-      page: 1,
-      hasMore: true,
-      isArtistSearch: false
-    });
+    searchState,
+    setSearchState
+  } = usePlayer();
 
   const [showActionModal, setShowActionModal] = useState(false);
   const [trackToAction, setTrackToAction] = useState<Track | null>(null);
