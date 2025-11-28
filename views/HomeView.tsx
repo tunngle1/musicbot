@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Play, MoreVertical, Search, Loader, Radio } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { Track, RadioStation } from '../types';
-import { searchTracks, getGenreTracks, getRadioStations } from '../utils/api';
-import { hapticFeedback } from '../utils/telegram';
+import { searchTracks, getGenreTracks, getRadioStations, downloadToChat } from '../utils/api';
+import { hapticFeedback, getTelegramUser } from '../utils/telegram';
 
 const HomeView: React.FC = () => {
   const {
@@ -30,6 +30,8 @@ const HomeView: React.FC = () => {
   const [showAllRadio, setShowAllRadio] = useState(false);
   const [showAllGenres, setShowAllGenres] = useState(false);
   const { playlists, addToPlaylist } = usePlayer();
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [trackToDownload, setTrackToDownload] = useState<Track | null>(null);
 
   // Отображаемые треки: результаты поиска или все треки
   const displayTracks = searchState.results.length > 0 ? searchState.results : (searchState.query.trim() ? [] : allTracks);
@@ -441,10 +443,11 @@ const HomeView: React.FC = () => {
                         onClick={(e) => {
                           e.stopPropagation();
                           if (downloadedTracks.has(track.id)) {
-                            // TODO: Confirm removal
-                            // removeDownloadedTrack(track.id);
+                            // Already downloaded
                           } else {
-                            downloadTrack(track);
+                            // Show download choice modal
+                            setTrackToDownload(track);
+                            setShowDownloadModal(true);
                           }
                         }}
                         disabled={isDownloading === track.id}
@@ -561,6 +564,64 @@ const HomeView: React.FC = () => {
           </div>
         )
       }
+
+      {/* Download Choice Modal */}
+      {showDownloadModal && trackToDownload && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 animate-fade-in" onClick={() => setShowDownloadModal(false)}>
+          <div className="bg-gray-900 w-full max-w-sm p-6 rounded-2xl border border-white/10 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-4 text-white">Куда скачать?</h3>
+
+            <div className="space-y-3">
+              <button
+                className="w-full py-4 bg-blue-600 rounded-xl font-medium text-white hover:bg-blue-500 transition-colors flex items-center justify-center gap-2"
+                onClick={async () => {
+                  downloadTrack(trackToDownload);
+                  setShowDownloadModal(false);
+                  setTrackToDownload(null);
+                  hapticFeedback.success();
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                В приложение
+              </button>
+
+              <button
+                className="w-full py-4 bg-purple-600 rounded-xl font-medium text-white hover:bg-purple-500 transition-colors flex items-center justify-center gap-2"
+                onClick={async () => {
+                  try {
+                    const user = getTelegramUser();
+                    if (!user) {
+                      alert('Не удалось получить данные пользователя');
+                      return;
+                    }
+                    await downloadToChat(user.id, trackToDownload);
+                    setShowDownloadModal(false);
+                    setTrackToDownload(null);
+                    hapticFeedback.success();
+                    alert('Трек отправлен в чат!');
+                  } catch (error) {
+                    console.error('Download to chat error:', error);
+                    alert('Ошибка при отправке в чат');
+                  }
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                В чат (Бот)
+              </button>
+
+              <button
+                className="w-full py-3 bg-gray-800 rounded-xl font-medium text-gray-300 hover:bg-gray-700 transition-colors"
+                onClick={() => {
+                  setShowDownloadModal(false);
+                  setTrackToDownload(null);
+                }}
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 };

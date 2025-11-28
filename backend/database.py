@@ -23,6 +23,17 @@ class User(Base):
     is_premium = Column(Boolean, default=False)
     joined_at = Column(DateTime, default=datetime.utcnow)
 
+class DownloadedMessage(Base):
+    __tablename__ = "downloaded_messages"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, index=True)  # Telegram user ID
+    chat_id = Column(Integer)  # Usually same as user_id for private chats
+    message_id = Column(Integer)  # Telegram message ID
+    track_id = Column(String)  # Track identifier
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     

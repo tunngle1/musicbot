@@ -12,12 +12,17 @@ from datetime import datetime
 
 try:
     from backend.hitmo_parser_light import HitmoParser
-    from backend.database import User, get_db, init_db
+    from backend.database import User, DownloadedMessage, get_db, init_db
     from backend.cache import make_cache_key, get_from_cache, set_to_cache, get_cache_stats, reset_cache
 except ImportError:
     from hitmo_parser_light import HitmoParser
-    from database import User, get_db, init_db
+    from database import User, DownloadedMessage, get_db, init_db
     from cache import make_cache_key, get_from_cache, set_to_cache, get_cache_stats, reset_cache
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # Pydantic модели
@@ -84,6 +89,11 @@ app.add_middleware(
 
 # Глобальный экземпляр парсера
 parser = HitmoParser()
+
+# Telegram Bot Token
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    print("WARNING: BOT_TOKEN not found in .env file")
 
 @app.on_event("startup")
 async def startup_event():
@@ -469,6 +479,117 @@ async def stream_audio(request: Request, url: str = Query(..., description="URL 
     except Exception as e:
         await client.aclose()
         print(f"Error streaming audio: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Download to Chat Endpoints ---
+
+class DownloadToChatRequest(BaseModel):
+    user_id: int
+    track: Track
+
+@app.post("/api/download/chat")
+async def download_to_chat(request: DownloadToChatRequest, db: Session = Depends(get_db)):
+    """
+    Download track to user's Telegram chat via bot
+    """
+    if not BOT_TOKEN:
+        raise HTTPException(status_code=500, detail="Bot token not configured")
+    
+    try:
+        # 1. Download audio file from URL
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            audio_response = await client.get(request.track.url)
+            audio_response.raise_for_status()
+            audio_data = audio_response.content
+        
+        # 2. Send to Telegram
+        telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendAudio"
+        
+        files = {
+            'audio': ('track.mp3', audio_data, 'audio/mpeg')
+        }
+        
+        data = {
+            'chat_id': request.user_id,
+            'title': request.track.title,
+            'performer': request.track.artist,
+            'duration': request.track.duration,
+            'protect_content': True  # Disable forwarding
+        }
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(telegram_url, files=files, data=data)
+            response.raise_for_status()
+            result = response.json()
+        
+        if not result.get('ok'):
+            raise HTTPException(status_code=500, detail=f"Telegram API error: {result}")
+        
+        message_id = result['result']['message_id']
+        
+        # 3. Save to database
+        downloaded_msg = DownloadedMessage(
+            user_id=request.user_id,
+            chat_id=request.user_id,
+            message_id=message_id,
+            track_id=request.track.id
+        )
+        db.add(downloaded_msg)
+        db.commit()
+        
+        return {
+            "status": "ok",
+            "message": "Track sent to chat",
+            "message_id": message_id
+        }
+        
+    except Exception as e:
+        print(f"Error downloading to chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/debug/expire_downloads")
+async def expire_downloads(user_id: int = Query(...), db: Session = Depends(get_db)):
+    """
+    Debug endpoint: Delete all downloaded messages for a user (simulate subscription expiry)
+    """
+    if not BOT_TOKEN:
+        raise HTTPException(status_code=500, detail="Bot token not configured")
+    
+    try:
+        # 1. Get all messages for user
+        messages = db.query(DownloadedMessage).filter(DownloadedMessage.user_id == user_id).all()
+        
+        if not messages:
+            return {"status": "ok", "message": "No messages to delete", "deleted_count": 0}
+        
+        # 2. Delete from Telegram
+        telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/deleteMessage"
+        deleted_count = 0
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for msg in messages:
+                try:
+                    response = await client.post(telegram_url, json={
+                        'chat_id': msg.chat_id,
+                        'message_id': msg.message_id
+                    })
+                    if response.status_code == 200:
+                        deleted_count += 1
+                except Exception as e:
+                    print(f"Failed to delete message {msg.message_id}: {e}")
+        
+        # 3. Delete from database
+        db.query(DownloadedMessage).filter(DownloadedMessage.user_id == user_id).delete()
+        db.commit()
+        
+        return {
+            "status": "ok",
+            "message": f"Deleted {deleted_count} messages",
+            "deleted_count": deleted_count
+        }
+        
+    except Exception as e:
+        print(f"Error expiring downloads: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.on_event("shutdown")

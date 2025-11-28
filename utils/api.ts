@@ -210,3 +210,35 @@ export const formatDuration = (seconds: number): string => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
+/**
+ * Download track to Telegram chat via bot
+ */
+export const downloadToChat = async (userId: number, track: Track): Promise<void> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/download/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                track: {
+                    id: track.id,
+                    title: track.title,
+                    artist: track.artist,
+                    duration: track.duration,
+                    url: track.audioUrl,
+                    image: track.coverUrl
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const error: ApiError = await response.json();
+            throw new Error(error.detail || 'Ошибка при отправке трека в чат');
+        }
+    } catch (error) {
+        console.error('Download to chat error:', error);
+        throw error;
+    }
+};
