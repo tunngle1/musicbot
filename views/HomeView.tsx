@@ -19,7 +19,8 @@ const HomeView: React.FC = () => {
     isDownloading,
     togglePlay,
     searchState,
-    setSearchState
+    setSearchState,
+    user
   } = usePlayer();
 
   const [showActionModal, setShowActionModal] = useState(false);
@@ -170,6 +171,28 @@ const HomeView: React.FC = () => {
 
   return (
     <div className="px-4 py-8 space-y-8 animate-fade-in-up pb-24">
+      {/* Premium Badge */}
+      {user?.is_premium && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500 p-[2px]">
+          <div className="bg-gray-900 rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-white">
+                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-sm">Premium подписка</h3>
+                <p className="text-yellow-200 text-xs">Скачивайте треки без ограничений</p>
+              </div>
+            </div>
+            <div className="px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full">
+              <span className="text-white text-xs font-bold">ACTIVE</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
@@ -708,8 +731,8 @@ const HomeView: React.FC = () => {
                 <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden">
                   <div
                     className={`h-full transition-all duration-300 ease-out ${downloadStatus === 'done'
-                        ? 'bg-gradient-to-r from-green-500 to-emerald-500'
-                        : 'bg-gradient-to-r from-blue-500 to-purple-500'
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500'
+                      : 'bg-gradient-to-r from-blue-500 to-purple-500'
                       }`}
                     style={{ width: `${downloadProgress}%` }}
                   />
