@@ -153,7 +153,14 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (savedPlaylists.length > 0) {
           setPlaylists(prev => {
             const defaultIds = new Set(INITIAL_PLAYLISTS.map(p => p.id));
-            const newPlaylists = savedPlaylists.filter(p => !defaultIds.has(p.id));
+            const newPlaylists = savedPlaylists
+              .filter(p => !defaultIds.has(p.id))
+              .map(p => {
+                if (p.coverBlob) {
+                  return { ...p, coverUrl: URL.createObjectURL(p.coverBlob) };
+                }
+                return p;
+              });
             return [...INITIAL_PLAYLISTS, ...newPlaylists];
           });
         }
@@ -210,14 +217,12 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Track if current track is downloaded (to avoid re-triggering when other tracks are downloaded)
   const isCurrentTrackDownloaded = currentTrack ? downloadedTracks.has(currentTrack.id) : false;
 
+  const previousTrackIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     const playAudio = async () => {
       if (currentTrack && audioRef.current) {
         try {
-          // Сбрасываем состояние при смене трека, чтобы не показывать данные предыдущего
-          // Но только если это действительно новый трек (проверка по ID или src не поможет, так как мы еще не знаем src)
-          // Лучше делать это при установке нового src
-
           let src = currentTrack.audioUrl;
 
           // Проверяем, скачан ли трек
@@ -244,10 +249,16 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           if (audioRef.current.src !== src) {
             // Save current playback position and playing state
             const wasPlaying = isPlaying;
+            const savedTime = audioRef.current.currentTime || 0;
 
-            // Reset time for new track
-            setDuration(0);
-            setCurrentTime(0);
+            // Check if we are switching sources for the SAME track
+            const isSameTrack = previousTrackIdRef.current === currentTrack.id;
+
+            // Reset time ONLY if it's a new track
+            if (!isSameTrack) {
+              setDuration(0);
+              setCurrentTime(0);
+            }
 
             // Освобождаем старый URL если это был blob
             if (audioRef.current.src.startsWith('blob:')) {
@@ -256,7 +267,13 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
             audioRef.current.src = src;
             audioRef.current.load(); // Явно загружаем новый источник
-            audioRef.current.currentTime = 0; // Ensure we start from 0
+
+            // Restore playback position ONLY if it's the same track (switching source)
+            if (isSameTrack && savedTime > 0) {
+              audioRef.current.currentTime = savedTime;
+            } else {
+              audioRef.current.currentTime = 0;
+            }
 
             if (wasPlaying) {
               const playPromise = audioRef.current.play();
@@ -268,6 +285,10 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               }
             }
           }
+
+          // Update previous track ID
+          previousTrackIdRef.current = currentTrack.id;
+
         } catch (e) {
           console.error("Play setup error:", e);
         }
@@ -376,7 +397,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       trackIds: []
     };
     setPlaylists(prev => [...prev, newPlaylist]);
-    storage.savePlaylist(newPlaylist).catch(err => {
+    storage.savePlaylist(newPlaylist, coverFile).catch(err => {
       console.error("Failed to save playlist:", err);
       // Revert state if save fails? Or just notify user
       if (window.Telegram?.WebApp?.showPopup) {
@@ -387,7 +408,18 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
   };
 
-  const addToPlaylist = (playlistId: string, track: Track) => {
+  const addToPlaylist = async (playlistId: string, track: Track) => {
+    // 0. Сохраняем метаданные трека в БД, если его там нет (чтобы он не пропал при перезагрузке)
+    try {
+      const existing = await storage.getTrack(track.id);
+      if (!existing) {
+        // Save without audio blob (metadata only)
+        await storage.saveTrack(track);
+      }
+    } catch (e) {
+      console.error("Failed to save track metadata:", e);
+    }
+
     // 1. Добавляем трек в общий список, если его там нет
     setAllTracks(prev => {
       if (!prev.some(t => t.id === track.id)) {

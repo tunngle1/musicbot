@@ -7,7 +7,7 @@ interface MusicDB extends DBSchema {
     tracks: {
         key: string;
         value: Track & {
-            audioBlob: Blob;
+            audioBlob?: Blob; // Made optional
             coverBlob?: Blob;
             savedAt: number;
         };
@@ -16,6 +16,7 @@ interface MusicDB extends DBSchema {
     playlists: {
         key: string;
         value: Playlist & {
+            coverBlob?: Blob; // Added coverBlob
             createdAt: number;
         };
         indexes: { 'by-date': number };
@@ -23,7 +24,7 @@ interface MusicDB extends DBSchema {
 }
 
 const DB_NAME = 'tg-music-player-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4; // Increment version
 
 class StorageService {
     private dbPromise: Promise<IDBPDatabase<MusicDB>>;
@@ -40,13 +41,13 @@ class StorageService {
                     const playlistStore = db.createObjectStore('playlists', { keyPath: 'id' });
                     playlistStore.createIndex('by-date', 'createdAt');
                 }
+                // Version 4 upgrade: nothing schema-breaking, just added optional fields
             },
             blocked(currentVersion, blockedVersion, event) {
                 console.warn("DB Open Blocked: Another tab has the DB open", currentVersion, blockedVersion);
             },
             blocking(currentVersion, blockedVersion, event) {
                 console.warn("DB Open Blocking: This tab is blocking a version upgrade", currentVersion, blockedVersion);
-                // Закрываем соединение, чтобы дать возможность обновиться
                 const db = (event.target as any).result;
                 db.close();
             },
@@ -56,18 +57,18 @@ class StorageService {
         });
     }
 
-    async saveTrack(track: Track, audioBlob: Blob, coverBlob?: Blob): Promise<void> {
+    async saveTrack(track: Track, audioBlob?: Blob, coverBlob?: Blob): Promise<void> {
         const db = await this.dbPromise;
         await db.put('tracks', {
             ...track,
             audioBlob,
             coverBlob,
             savedAt: Date.now(),
-            isLocal: true
+            isLocal: !!audioBlob // Only local if we have the audio
         });
     }
 
-    async getTrack(id: string): Promise<(Track & { audioBlob: Blob; coverBlob?: Blob }) | undefined> {
+    async getTrack(id: string): Promise<(Track & { audioBlob?: Blob; coverBlob?: Blob }) | undefined> {
         const db = await this.dbPromise;
         return db.get('tracks', id);
     }
@@ -75,11 +76,13 @@ class StorageService {
     async getAllTracks(): Promise<Track[]> {
         const db = await this.dbPromise;
         const tracks = await db.getAllFromIndex('tracks', 'by-date');
-        // Возвращаем треки без блобов для списка, чтобы не забивать память
-        return tracks.map(({ audioBlob, coverBlob, ...track }) => ({
-            ...track,
-            isLocal: true
-        }));
+        // Return only tracks that have audioBlob (downloaded)
+        return tracks
+            .filter(t => !!t.audioBlob)
+            .map(({ audioBlob, coverBlob, ...track }) => ({
+                ...track,
+                isLocal: true
+            }));
     }
 
     async deleteTrack(id: string): Promise<void> {
@@ -89,24 +92,24 @@ class StorageService {
 
     async isTrackDownloaded(id: string): Promise<boolean> {
         const db = await this.dbPromise;
-        const key = await db.getKey('tracks', id);
-        return !!key;
+        const track = await db.get('tracks', id);
+        return !!track?.audioBlob;
     }
 
     // Playlist methods
 
-    async savePlaylist(playlist: Playlist): Promise<void> {
+    async savePlaylist(playlist: Playlist, coverBlob?: Blob): Promise<void> {
         const db = await this.dbPromise;
-        // Проверяем, существует ли уже плейлист, чтобы сохранить дату создания
         const existing = await db.get('playlists', playlist.id);
 
         await db.put('playlists', {
             ...playlist,
+            coverBlob: coverBlob || existing?.coverBlob, // Keep existing blob if not provided
             createdAt: existing ? existing.createdAt : Date.now()
         });
     }
 
-    async getAllPlaylists(): Promise<Playlist[]> {
+    async getAllPlaylists(): Promise<(Playlist & { coverBlob?: Blob })[]> {
         const db = await this.dbPromise;
         const playlists = await db.getAllFromIndex('playlists', 'by-date');
         return playlists.map(({ createdAt, ...playlist }) => playlist);

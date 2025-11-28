@@ -534,12 +534,29 @@ const HomeView: React.FC = () => {
                 )}
               </div>
 
-              <button
-                className="w-full mt-4 py-3 bg-gray-800 rounded-xl font-medium text-gray-300 hover:bg-gray-700 transition-colors"
-                onClick={() => setShowActionModal(false)}
-              >
-                Отмена
-              </button>
+              <div className="mt-4 space-y-2">
+                <button
+                  className="w-full py-3 bg-blue-600 rounded-xl font-medium text-white hover:bg-blue-500 transition-colors flex items-center justify-center gap-2"
+                  onClick={() => {
+                    if (trackToAction) {
+                      downloadTrack(trackToAction);
+                      setShowActionModal(false);
+                      setTrackToAction(null);
+                      hapticFeedback.success();
+                    }
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  Скачать трек
+                </button>
+
+                <button
+                  className="w-full py-3 bg-gray-800 rounded-xl font-medium text-gray-300 hover:bg-gray-700 transition-colors"
+                  onClick={() => setShowActionModal(false)}
+                >
+                  Отмена
+                </button>
+              </div>
             </div>
           </div>
         )
