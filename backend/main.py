@@ -12,12 +12,14 @@ from datetime import datetime
 
 try:
     from backend.hitmo_parser_light import HitmoParser
-    from backend.database import User, DownloadedMessage, get_db, init_db
+    from backend.database import User, DownloadedMessage, Lyrics, get_db, init_db
     from backend.cache import make_cache_key, get_from_cache, set_to_cache, get_cache_stats, reset_cache
+    from backend.lyrics_service import LyricsService
 except ImportError:
     from hitmo_parser_light import HitmoParser
-    from database import User, DownloadedMessage, get_db, init_db
+    from database import User, DownloadedMessage, Lyrics, get_db, init_db
     from cache import make_cache_key, get_from_cache, set_to_cache, get_cache_stats, reset_cache
+    from lyrics_service import LyricsService
 
 import os
 from dotenv import load_dotenv
@@ -107,6 +109,20 @@ parser = HitmoParser()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     print("WARNING: BOT_TOKEN not found in .env file")
+
+# Genius API Token
+GENIUS_API_TOKEN = os.getenv("GENIUS_API_TOKEN")
+if not GENIUS_API_TOKEN:
+    print("WARNING: GENIUS_API_TOKEN not found in .env file")
+
+# Initialize Lyrics Service
+lyrics_service = None
+if GENIUS_API_TOKEN:
+    try:
+        lyrics_service = LyricsService(GENIUS_API_TOKEN)
+        print("✅ Lyrics service initialized")
+    except Exception as e:
+        print(f"❌ Failed to initialize lyrics service: {e}")
 
 @app.on_event("startup")
 async def startup_event():
@@ -685,6 +701,83 @@ async def expire_downloads(user_id: int = Query(...), db: Session = Depends(get_
         
     except Exception as e:
         print(f"Error expiring downloads: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Lyrics Endpoints ---
+
+class LyricsResponse(BaseModel):
+    track_id: str
+    title: str
+    artist: str
+    lyrics_text: str
+    source: str
+
+@app.get("/api/lyrics/{track_id}", response_model=LyricsResponse)
+async def get_lyrics(
+    track_id: str,
+    title: str = Query(..., description="Song title"),
+    artist: str = Query(..., description="Artist name"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get lyrics for a track
+    First checks cache (database), then fetches from Genius API if not found
+    """
+    try:
+        # 1. Check cache (database)
+        cached_lyrics = db.query(Lyrics).filter(Lyrics.track_id == track_id).first()
+        
+        if cached_lyrics:
+            print(f"Lyrics found in cache for: {artist} - {title}")
+            return LyricsResponse(
+                track_id=cached_lyrics.track_id,
+                title=cached_lyrics.title,
+                artist=cached_lyrics.artist,
+                lyrics_text=cached_lyrics.lyrics_text,
+                source=cached_lyrics.source
+            )
+        
+        # 2. Fetch from Genius API
+        if not lyrics_service:
+            raise HTTPException(
+                status_code=503,
+                detail="Lyrics service not available. GENIUS_API_TOKEN not configured."
+            )
+        
+        lyrics_text = lyrics_service.get_lyrics(title, artist)
+        
+        if not lyrics_text:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Lyrics not found for: {artist} - {title}"
+            )
+        
+        # 3. Save to cache
+        new_lyrics = Lyrics(
+            track_id=track_id,
+            title=title,
+            artist=artist,
+            lyrics_text=lyrics_text,
+            source="genius"
+        )
+        db.add(new_lyrics)
+        db.commit()
+        db.refresh(new_lyrics)
+        
+        print(f"Lyrics cached for: {artist} - {title}")
+        
+        return LyricsResponse(
+            track_id=new_lyrics.track_id,
+            title=new_lyrics.title,
+            artist=new_lyrics.artist,
+            lyrics_text=new_lyrics.lyrics_text,
+            source=new_lyrics.source
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting lyrics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.on_event("shutdown")

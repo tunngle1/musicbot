@@ -242,3 +242,31 @@ export const downloadToChat = async (userId: number, track: Track): Promise<void
         throw error;
     }
 };
+
+/**
+ * Get lyrics for a track
+ */
+export const getLyrics = async (trackId: string, title: string, artist: string): Promise<any> => {
+    try {
+        const url = new URL(`${API_BASE_URL}/api/lyrics/${trackId}`);
+        url.searchParams.append('title', title);
+        url.searchParams.append('artist', artist);
+
+        const response = await fetch(url.toString());
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw new Error('Текст песни не найден');
+            } else if (response.status === 503) {
+                throw new Error('Сервис текстов недоступен');
+            }
+            const error: ApiError = await response.json();
+            throw new Error(error.detail || 'Ошибка при получении текста');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Get lyrics error:', error);
+        throw error;
+    }
+};

@@ -1,7 +1,9 @@
-import React from 'react';
-import { ChevronDown, Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Download, Share2, Shuffle } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronDown, Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Download, Share2, Shuffle, FileText } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { formatTime } from '../utils/format';
+import { getLyrics } from '../utils/api';
+import LyricsModal from './LyricsModal';
 
 interface FullPlayerProps {
   onCollapse: () => void;
@@ -25,6 +27,29 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
     toggleShuffle,
     downloadTrack
   } = usePlayer();
+
+  // Lyrics state
+  const [showLyrics, setShowLyrics] = useState(false);
+  const [lyrics, setLyrics] = useState<string | null>(null);
+  const [lyricsLoading, setLyricsLoading] = useState(false);
+  const [lyricsError, setLyricsError] = useState<string | null>(null);
+
+  const handleShowLyrics = async () => {
+    if (!currentTrack) return;
+
+    setShowLyrics(true);
+    setLyricsLoading(true);
+    setLyricsError(null);
+
+    try {
+      const response = await getLyrics(currentTrack.id, currentTrack.title, currentTrack.artist);
+      setLyrics(response.lyrics_text);
+    } catch (error: any) {
+      setLyricsError(error.message || 'Не удалось загрузить текст песни');
+    } finally {
+      setLyricsLoading(false);
+    }
+  };
 
   if (!currentTrack && !currentRadio) return null;
 
@@ -75,12 +100,22 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
             <p className="text-lg text-gray-400">{subtitle}</p>
           </div>
           {!isRadioMode && currentTrack && (
-            <button
-              onClick={() => downloadTrack(currentTrack)}
-              className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
-            >
-              <Download size={20} className="text-blue-400" />
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleShowLyrics}
+                className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+                title="Текст песни"
+              >
+                <FileText size={20} className="text-purple-400" />
+              </button>
+              <button
+                onClick={() => downloadTrack(currentTrack)}
+                className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+                title="Скачать"
+              >
+                <Download size={20} className="text-blue-400" />
+              </button>
+            </div>
           )}
         </div>
 
@@ -156,6 +191,17 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
           </button>
         </div>
       </div>
+
+      {/* Lyrics Modal */}
+      <LyricsModal
+        isOpen={showLyrics}
+        onClose={() => setShowLyrics(false)}
+        title={currentTrack?.title || ''}
+        artist={currentTrack?.artist || ''}
+        lyrics={lyrics}
+        isLoading={lyricsLoading}
+        error={lyricsError}
+      />
     </div>
   );
 };

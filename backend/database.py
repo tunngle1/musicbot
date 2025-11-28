@@ -34,6 +34,18 @@ class DownloadedMessage(Base):
     track_id = Column(String)  # Track identifier
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class Lyrics(Base):
+    __tablename__ = "lyrics"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    track_id = Column(String, unique=True, index=True)  # Unique track identifier
+    title = Column(String)
+    artist = Column(String)
+    lyrics_text = Column(String)  # Full lyrics text
+    source = Column(String, default="genius")  # Source: genius, manual, etc.
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 
 def init_db():
     Base.metadata.create_all(bind=engine)

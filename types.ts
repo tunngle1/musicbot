@@ -32,6 +32,14 @@ export interface User {
   is_premium: boolean;
 }
 
+export interface Lyrics {
+  track_id: string;
+  title: string;
+  artist: string;
+  lyrics_text: string;
+  source: string;
+}
+
 export enum ViewState {
   HOME = 'home',
   PLAYLISTS = 'playlists',
