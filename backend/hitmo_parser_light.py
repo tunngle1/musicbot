@@ -15,7 +15,10 @@ class HitmoParser:
     
     def __init__(self):
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': self.BASE_URL,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
         }
         
     def search(self, query: str, limit: int = 20, page: int = 1) -> List[Dict]:
@@ -153,15 +156,7 @@ class HitmoParser:
         try:
             url = f"{self.BASE_URL}/genre/{genre_id}"
             
-            # Add more headers to bypass 403
-            headers = {
-                **self.headers,
-                'Referer': self.BASE_URL,
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-            }
-            
-            with httpx.Client(headers=headers, timeout=10.0, follow_redirects=True) as client:
+            with httpx.Client(headers=self.headers, timeout=10.0, follow_redirects=True) as client:
                 response = client.get(url)
                 response.raise_for_status()
                 
