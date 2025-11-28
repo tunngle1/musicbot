@@ -24,6 +24,48 @@ const AppContent: React.FC = () => {
   // Инициализация Telegram WebApp
   useEffect(() => {
     initTelegramWebApp();
+
+    // Request persistent storage to prevent automatic cleanup
+    const requestPersistentStorage = async () => {
+      if (navigator.storage && navigator.storage.persist) {
+        try {
+          const isPersisted = await navigator.storage.persist();
+          console.log(`🔒 Persistent storage: ${isPersisted ? 'GRANTED ✅' : 'DENIED ❌'}`);
+
+          if (isPersisted) {
+            console.log('✅ Downloaded tracks will be protected from automatic cleanup');
+          } else {
+            console.warn('⚠️ Storage may be cleared automatically. Download tracks at your own risk.');
+          }
+        } catch (error) {
+          console.error('Error requesting persistent storage:', error);
+        }
+      }
+
+      // Check if storage is already persisted
+      if (navigator.storage && navigator.storage.persisted) {
+        try {
+          const isPersisted = await navigator.storage.persisted();
+          console.log(`📦 Storage persistence status: ${isPersisted}`);
+        } catch (error) {
+          console.error('Error checking storage persistence:', error);
+        }
+      }
+
+      // Log storage usage
+      if (navigator.storage && navigator.storage.estimate) {
+        try {
+          const estimate = await navigator.storage.estimate();
+          const usedMB = ((estimate.usage || 0) / 1024 / 1024).toFixed(2);
+          const quotaMB = ((estimate.quota || 0) / 1024 / 1024).toFixed(2);
+          console.log(`💾 Storage used: ${usedMB} MB / ${quotaMB} MB`);
+        } catch (error) {
+          console.error('Error estimating storage:', error);
+        }
+      }
+    };
+
+    requestPersistentStorage();
   }, []);
 
   const renderView = () => {

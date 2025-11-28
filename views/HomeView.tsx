@@ -57,7 +57,7 @@ const HomeView: React.FC = () => {
           error: 'Ошибка при поиске. Проверьте подключение к серверу.'
         }));
       }
-    }, 500);
+    }, 3000); // 3 seconds debounce
 
     return () => clearTimeout(timeoutId);
   }, [searchState.query, searchState.isArtistSearch, setSearchState]);

@@ -8,15 +8,40 @@ const LibraryView: React.FC = () => {
   const { addTrack, playTrack, currentTrack, isPlaying, removeDownloadedTrack, togglePlay } = usePlayer();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [libraryTracks, setLibraryTracks] = useState<Track[]>([]);
+  const [storageInfo, setStorageInfo] = useState<{
+    usedMB: string;
+    quotaMB: string;
+    isPersisted: boolean;
+  } | null>(null);
 
   useEffect(() => {
     loadLibraryTracks();
+    loadStorageInfo();
   }, []);
 
   const loadLibraryTracks = async () => {
     const tracks = await storage.getAllTracks();
     // Сортируем: сначала новые
     setLibraryTracks(tracks.reverse());
+  };
+
+  const loadStorageInfo = async () => {
+    try {
+      let isPersisted = false;
+      if (navigator.storage && navigator.storage.persisted) {
+        isPersisted = await navigator.storage.persisted();
+      }
+
+      if (navigator.storage && navigator.storage.estimate) {
+        const estimate = await navigator.storage.estimate();
+        const usedMB = ((estimate.usage || 0) / 1024 / 1024).toFixed(2);
+        const quotaMB = ((estimate.quota || 0) / 1024 / 1024).toFixed(2);
+
+        setStorageInfo({ usedMB, quotaMB, isPersisted });
+      }
+    } catch (error) {
+      console.error('Error loading storage info:', error);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +77,8 @@ const LibraryView: React.FC = () => {
     if (confirm('Удалить этот трек из загрузок?')) {
       await removeDownloadedTrack(trackId);
       setLibraryTracks(prev => prev.filter(t => t.id !== trackId));
+      // Reload storage info after deletion
+      loadStorageInfo();
     }
   };
 
@@ -60,6 +87,31 @@ const LibraryView: React.FC = () => {
       <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
         Медиатека
       </h1>
+
+      {/* Storage Info Card */}
+      {storageInfo && (
+        <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/10 rounded-xl p-4">
+          <div className="flex items-start justify-between mb-2">
+            <div>
+              <h3 className="text-sm font-semibold text-white mb-1">Хранилище</h3>
+              <p className="text-xs text-gray-400">
+                Использовано: {storageInfo.usedMB} МБ / {storageInfo.quotaMB} МБ
+              </p>
+            </div>
+            <div className={`px-2 py-1 rounded-full text-xs font-medium ${storageInfo.isPersisted
+                ? 'bg-green-500/20 text-green-400'
+                : 'bg-yellow-500/20 text-yellow-400'
+              }`}>
+              {storageInfo.isPersisted ? '🔒 Защищено' : '⚠️ Не защищено'}
+            </div>
+          </div>
+          {!storageInfo.isPersisted && (
+            <p className="text-xs text-gray-500 mt-2">
+              💡 Данные могут быть удалены при нехватке места. Не очищайте кэш Telegram вручную.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Upload Area */}
       <div

@@ -180,6 +180,9 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, []); // Remove repeatMode from dependencies!
 
   // Управление воспроизведением при смене трека
+  // Track if current track is downloaded (to avoid re-triggering when other tracks are downloaded)
+  const isCurrentTrackDownloaded = currentTrack ? downloadedTracks.has(currentTrack.id) : false;
+
   useEffect(() => {
     const playAudio = async () => {
       if (currentTrack && audioRef.current) {
@@ -191,7 +194,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           let src = currentTrack.audioUrl;
 
           // Проверяем, скачан ли трек
-          if (downloadedTracks.has(currentTrack.id)) {
+          if (isCurrentTrackDownloaded) {
             try {
               const savedTrack = await storage.getTrack(currentTrack.id);
               if (savedTrack && savedTrack.audioBlob) {
@@ -212,9 +215,16 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           }
 
           if (audioRef.current.src !== src) {
-            // Сбрасываем длительность пока грузится новый трек
-            setDuration(0);
-            setCurrentTime(0);
+            // Save current playback position and playing state
+            const wasPlaying = isPlaying;
+            const savedTime = audioRef.current.currentTime || 0;
+            const hadPreviousSrc = audioRef.current.src !== '';
+
+            // Only reset time if this is a completely new track (not just switching source)
+            if (!hadPreviousSrc || savedTime === 0) {
+              setDuration(0);
+              setCurrentTime(0);
+            }
 
             // Освобождаем старый URL если это был blob
             if (audioRef.current.src.startsWith('blob:')) {
@@ -224,7 +234,12 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             audioRef.current.src = src;
             audioRef.current.load(); // Явно загружаем новый источник
 
-            if (isPlaying) {
+            // Restore playback position if we're switching sources for the same track
+            if (hadPreviousSrc && savedTime > 0) {
+              audioRef.current.currentTime = savedTime;
+            }
+
+            if (wasPlaying) {
               const playPromise = audioRef.current.play();
               if (playPromise !== undefined) {
                 playPromise.catch(e => {
@@ -241,7 +256,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     playAudio();
-  }, [currentTrack, downloadedTracks]);
+  }, [currentTrack, isCurrentTrackDownloaded]);
 
   // Управление play/pause
   useEffect(() => {
