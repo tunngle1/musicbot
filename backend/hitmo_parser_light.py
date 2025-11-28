@@ -153,7 +153,15 @@ class HitmoParser:
         try:
             url = f"{self.BASE_URL}/genre/{genre_id}"
             
-            with httpx.Client(headers=self.headers, timeout=10.0) as client:
+            # Add more headers to bypass 403
+            headers = {
+                **self.headers,
+                'Referer': self.BASE_URL,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+            }
+            
+            with httpx.Client(headers=headers, timeout=10.0, follow_redirects=True) as client:
                 response = client.get(url)
                 response.raise_for_status()
                 
