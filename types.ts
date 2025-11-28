@@ -15,6 +15,14 @@ export interface Playlist {
   trackIds: string[];
 }
 
+export interface RadioStation {
+  id: string;
+  name: string;
+  genre: string;
+  url: string;
+  image: string;
+}
+
 export enum ViewState {
   HOME = 'HOME',
   PLAYLISTS = 'PLAYLISTS',
@@ -23,3 +31,4 @@ export enum ViewState {
 }
 
 export type RepeatMode = 'none' | 'all' | 'one';
+

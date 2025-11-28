@@ -243,5 +243,100 @@ class HitmoParser:
             print(f"Genre tracks error: {e}")
             return []
 
+    def get_radio_stations(self) -> List[Dict]:
+        """
+        Get list of popular radio stations
+        Since Hitmo doesn't have a dedicated radio section, we'll provide popular Russian radio streams
+        """
+        # Popular Russian radio stations with direct stream URLs
+        stations = [
+            {
+                'id': 'radio_energy',
+                'name': 'Energy',
+                'genre': 'Хиты',
+                'url': 'https://pub0302.101.ru:8443/stream/air/aac/64/99',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s24939q.png'
+            },
+            {
+                'id': 'radio_europa_plus',
+                'name': 'Европа Плюс',
+                'genre': 'Поп',
+                'url': 'https://ep128.hostingradio.ru:8030/ep128',
+                'image': 'https://cdn-profiles.tunein.com/s8439/images/logog.png'
+            },
+            {
+                'id': 'radio_record',
+                'name': 'Radio Record',
+                'genre': 'Электроника',
+                'url': 'https://radiorecord.hostingradio.ru/rr_main96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s25419q.png'
+            },
+            {
+                'id': 'radio_maximum',
+                'name': 'Maximum',
+                'genre': 'Рок',
+                'url': 'https://maximum.hostingradio.ru/maximum96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6882q.png'
+            },
+            {
+                'id': 'radio_monte_carlo',
+                'name': 'Monte Carlo',
+                'genre': 'Релакс',
+                'url': 'https://montecarlo.hostingradio.ru/montecarlo96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6883q.png'
+            },
+            {
+                'id': 'radio_dfm',
+                'name': 'DFM',
+                'genre': 'Танцевальная',
+                'url': 'https://dfm.hostingradio.ru/dfm96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6881q.png'
+            },
+            {
+                'id': 'radio_retro',
+                'name': 'Ретро FM',
+                'genre': 'Ретро',
+                'url': 'https://retro.hostingradio.ru:8043/retro128',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6884q.png'
+            },
+            {
+                'id': 'radio_chanson',
+                'name': 'Шансон',
+                'genre': 'Шансон',
+                'url': 'https://chanson.hostingradio.ru:8041/chanson128.mp3',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6885q.png'
+            },
+            {
+                'id': 'radio_jazz',
+                'name': 'Jazz FM',
+                'genre': 'Джаз',
+                'url': 'https://nashe1.hostingradio.ru/jazz-128.mp3',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s25418q.png'
+            },
+            {
+                'id': 'radio_relax',
+                'name': 'Relax FM',
+                'genre': 'Релакс',
+                'url': 'https://relaxfm.hostingradio.ru/relax128.mp3',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6886q.png'
+            },
+            {
+                'id': 'radio_hits',
+                'name': 'Хит FM',
+                'genre': 'Хиты',
+                'url': 'https://hitfm.hostingradio.ru/hitfm96.aacp',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6887q.png'
+            },
+            {
+                'id': 'radio_comedy',
+                'name': 'Comedy Radio',
+                'genre': 'Юмор',
+                'url': 'https://pub0302.101.ru:8443/stream/reg/aac/64/102',
+                'image': 'https://cdn-radiotime-logos.tunein.com/s6888q.png'
+            }
+        ]
+        
+        return stations
+
     def close(self):
         pass

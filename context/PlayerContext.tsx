@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect, ReactNode } from 'react';
-import { Track, Playlist, RepeatMode } from '../types';
+import { Track, Playlist, RepeatMode, RadioStation } from '../types';
 import { MOCK_TRACKS, INITIAL_PLAYLISTS } from '../constants';
 
 interface PlayerContextType {
@@ -18,6 +18,7 @@ interface PlayerContextType {
 
   // Действия
   playTrack: (track: Track, newQueue?: Track[]) => void;
+  playRadio: (station: RadioStation) => void;
   togglePlay: () => void;
   nextTrack: () => void;
   prevTrack: () => void;
@@ -62,6 +63,8 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [allTracks, setAllTracks] = useState<Track[]>(MOCK_TRACKS);
   const [playlists, setPlaylists] = useState<Playlist[]>(INITIAL_PLAYLISTS);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [currentRadio, setCurrentRadio] = useState<RadioStation | null>(null);
+  const [isRadioMode, setIsRadioMode] = useState(false);
   const [queue, setQueue] = useState<Track[]>(MOCK_TRACKS);
   const [downloadedTracks, setDownloadedTracks] = useState<Set<string>>(new Set());
 
@@ -274,7 +277,23 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setQueue(newQueue);
     }
     setCurrentTrack(track);
+    setCurrentRadio(null);
+    setIsRadioMode(false);
     setIsPlaying(true);
+  };
+
+  const playRadio = (station: RadioStation) => {
+    setCurrentRadio(station);
+    setCurrentTrack(null);
+    setIsRadioMode(true);
+    setIsPlaying(true);
+
+    // Set audio source directly for radio
+    if (audioRef.current) {
+      audioRef.current.src = station.url;
+      audioRef.current.load();
+      audioRef.current.play().catch(e => console.error("Radio play error:", e));
+    }
   };
 
   const togglePlay = () => setIsPlaying(!isPlaying);
@@ -437,6 +456,8 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       allTracks,
       playlists,
       currentTrack,
+      currentRadio,
+      isRadioMode,
       isPlaying,
       currentTime,
       duration,
@@ -446,6 +467,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       isDownloading,
       isShuffle,
       playTrack,
+      playRadio,
       togglePlay,
       nextTrack,
       prevTrack,

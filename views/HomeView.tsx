@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Play, MoreVertical, Search, Loader } from 'lucide-react';
+import { Play, MoreVertical, Search, Loader, Radio } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
-import { Track } from '../types';
-import { searchTracks, getGenreTracks } from '../utils/api';
+import { Track, RadioStation } from '../types';
+import { searchTracks, getGenreTracks, getRadioStations } from '../utils/api';
 import { hapticFeedback } from '../utils/telegram';
 
 const HomeView: React.FC = () => {
   const {
     playTrack,
+    playRadio,
     currentTrack,
+    currentRadio,
+    isRadioMode,
     isPlaying,
     allTracks,
     downloadTrack,
@@ -22,6 +25,8 @@ const HomeView: React.FC = () => {
   const [showActionModal, setShowActionModal] = useState(false);
   const [trackToAction, setTrackToAction] = useState<Track | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [radioStations, setRadioStations] = useState<RadioStation[]>([]);
+  const [isLoadingRadio, setIsLoadingRadio] = useState(false);
   const { playlists, addToPlaylist } = usePlayer();
 
   // Отображаемые треки: результаты поиска или все треки
@@ -105,28 +110,53 @@ const HomeView: React.FC = () => {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
-    
+
     // Immediately clear results and reset state when starting a new search
     if (query.trim().length > 0) {
-      setSearchState(prev => ({ 
-        ...prev, 
-        query, 
-        isArtistSearch: false, 
+      setSearchState(prev => ({
+        ...prev,
+        query,
+        isArtistSearch: false,
         genreId: null,
         results: [], // Clear results immediately
         error: null
       }));
     } else {
       // If query is empty, clear everything
-      setSearchState(prev => ({ 
-        ...prev, 
-        query, 
-        isArtistSearch: false, 
-        genreId: null, 
-        results: [], 
-        hasMore: true, 
-        error: null 
+      setSearchState(prev => ({
+        ...prev,
+        query,
+        isArtistSearch: false,
+        genreId: null,
+        results: [],
+        hasMore: true,
+        error: null
       }));
+    }
+  };
+
+  // Load radio stations on mount
+  useEffect(() => {
+    const loadRadio = async () => {
+      setIsLoadingRadio(true);
+      try {
+        const stations = await getRadioStations();
+        setRadioStations(stations);
+      } catch (err) {
+        console.error('Failed to load radio stations:', err);
+      } finally {
+        setIsLoadingRadio(false);
+      }
+    };
+    loadRadio();
+  }, []);
+
+  const handleRadioPlay = (station: RadioStation) => {
+    hapticFeedback.light();
+    if (isRadioMode && currentRadio?.id === station.id) {
+      togglePlay();
+    } else {
+      playRadio(station);
     }
   };
 
@@ -238,128 +268,193 @@ const HomeView: React.FC = () => {
         </div>
       )}
 
-      {/* Track List */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4 text-gray-100">
-          {searchState.query.trim() ? 'Результаты поиска' : 'Популярное'}
-        </h3>
-        <div className="space-y-3">
-          {displayTracks.length === 0 && !searchState.isSearching && !searchState.error && (
-            <div className="text-center py-8 text-gray-400">
-              Начните поиск, чтобы найти музыку
+      {/* Radio Stations Section - Only show when not searching */}
+      {!searchState.query.trim() && searchState.results.length === 0 && !searchState.isSearching && (
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-gray-100 flex items-center gap-2">
+            <Radio size={20} className="text-blue-400" />
+            Радио
+          </h3>
+
+          {isLoadingRadio ? (
+            <div className="flex justify-center py-8">
+              <Loader size={32} className="animate-spin text-blue-400" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {radioStations.map((station) => {
+                const isCurrentStation = isRadioMode && currentRadio?.id === station.id;
+                return (
+                  <button
+                    key={station.id}
+                    onClick={() => handleRadioPlay(station)}
+                    className={`relative p-4 rounded-xl transition-all ${isCurrentStation
+                        ? 'bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-2 border-blue-400'
+                        : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                      }`}
+                  >
+                    <div className="aspect-square rounded-lg overflow-hidden mb-3 relative">
+                      <img
+                        src={station.image}
+                        alt={station.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(station.name)}&size=200&background=random`;
+                        }}
+                      />
+                      {isCurrentStation && isPlaying && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <div className="flex space-x-1 items-end h-4">
+                            <div className="w-1 bg-blue-400 animate-pulse h-2"></div>
+                            <div className="w-1 bg-blue-400 animate-pulse h-4" style={{ animationDelay: '0.2s' }}></div>
+                            <div className="w-1 bg-blue-400 animate-pulse h-3" style={{ animationDelay: '0.4s' }}></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <h4 className={`text-sm font-semibold truncate ${isCurrentStation ? 'text-blue-400' : 'text-white'
+                      }`}>
+                      {station.name}
+                    </h4>
+                    <p className="text-xs text-gray-400 truncate">{station.genre}</p>
+                    {isCurrentStation && (
+                      <div className="absolute top-2 right-2 px-2 py-1 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+                        LIVE
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
+        </div>
+      )}
 
-          {displayTracks.map((track) => {
-            const isCurrent = currentTrack?.id === track.id;
-            return (
-              <div
-                key={track.id}
-                className={`flex items-center p-3 rounded-xl transition-all cursor-pointer ${isCurrent ? 'bg-white/10 border border-white/5' : 'hover:bg-white/5'
-                  }`}
-                onClick={() => handlePlay(track)}
-              >
-                <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 mr-4 group">
-                  <img
-                    src={track.coverUrl}
-                    alt={track.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      // Fallback image on error
-                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(track.artist)}&size=200&background=random`;
-                    }}
-                  />
-                  <div className={`absolute inset-0 bg-black/40 flex items-center justify-center ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                    }`}>
-                    {isCurrent && isPlaying ? (
-                      <div className="flex space-x-[2px] items-end h-4">
-                        <div className="w-[3px] bg-blue-400 animate-bounce h-2"></div>
-                        <div className="w-[3px] bg-blue-400 animate-bounce h-4 delay-75"></div>
-                        <div className="w-[3px] bg-blue-400 animate-bounce h-3 delay-150"></div>
-                      </div>
-                    ) : (
-                      <Play size={16} fill="white" />
-                    )}
+      {/* Track List - Only show when searching */}
+      {(searchState.query.trim() || searchState.results.length > 0) && (
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-gray-100">
+            {searchState.query.trim() ? 'Результаты поиска' : 'Популярное'}
+          </h3>
+          <div className="space-y-3">
+            {displayTracks.length === 0 && !searchState.isSearching && !searchState.error && (
+              <div className="text-center py-8 text-gray-400">
+                Начните поиск, чтобы найти музыку
+              </div>
+            )}
+
+            {displayTracks.map((track) => {
+              const isCurrent = currentTrack?.id === track.id;
+              return (
+                <div
+                  key={track.id}
+                  className={`flex items-center p-3 rounded-xl transition-all cursor-pointer ${isCurrent ? 'bg-white/10 border border-white/5' : 'hover:bg-white/5'
+                    }`}
+                  onClick={() => handlePlay(track)}
+                >
+                  <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 mr-4 group">
+                    <img
+                      src={track.coverUrl}
+                      alt={track.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback image on error
+                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(track.artist)}&size=200&background=random`;
+                      }}
+                    />
+                    <div className={`absolute inset-0 bg-black/40 flex items-center justify-center ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`}>
+                      {isCurrent && isPlaying ? (
+                        <div className="flex space-x-[2px] items-end h-4">
+                          <div className="w-[3px] bg-blue-400 animate-bounce h-2"></div>
+                          <div className="w-[3px] bg-blue-400 animate-bounce h-4 delay-75"></div>
+                          <div className="w-[3px] bg-blue-400 animate-bounce h-3 delay-150"></div>
+                        </div>
+                      ) : (
+                        <Play size={16} fill="white" />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`text-sm font-medium truncate ${isCurrent ? 'text-blue-400' : 'text-white'
+                      }`}>
+                      {track.title}
+                    </h4>
+                    <p className="text-xs text-gray-400 truncate">{track.artist}</p>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {/* Download Button */}
+                    <button
+                      className={`p-2 transition-colors ${downloadedTracks.has(track.id)
+                        ? 'text-blue-400'
+                        : isDownloading === track.id
+                          ? 'text-blue-400 animate-pulse'
+                          : 'text-gray-500 hover:text-white'
+                        }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (downloadedTracks.has(track.id)) {
+                          // TODO: Confirm removal
+                          // removeDownloadedTrack(track.id);
+                        } else {
+                          downloadTrack(track);
+                        }
+                      }}
+                      disabled={isDownloading === track.id}
+                    >
+                      {isDownloading === track.id ? (
+                        <Loader size={16} className="animate-spin" />
+                      ) : downloadedTracks.has(track.id) ? (
+                        <div className="relative">
+                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        </div>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                      )}
+                    </button>
+
+                    <button
+                      className="p-2 text-gray-500 hover:text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        hapticFeedback.selection();
+                        setTrackToAction(track);
+                        setShowActionModal(true);
+                      }}
+                    >
+                      <MoreVertical size={16} />
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex-1 min-w-0">
-                  <h4 className={`text-sm font-medium truncate ${isCurrent ? 'text-blue-400' : 'text-white'
-                    }`}>
-                    {track.title}
-                  </h4>
-                  <p className="text-xs text-gray-400 truncate">{track.artist}</p>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  {/* Download Button */}
-                  <button
-                    className={`p-2 transition-colors ${downloadedTracks.has(track.id)
-                      ? 'text-blue-400'
-                      : isDownloading === track.id
-                        ? 'text-blue-400 animate-pulse'
-                        : 'text-gray-500 hover:text-white'
-                      }`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (downloadedTracks.has(track.id)) {
-                        // TODO: Confirm removal
-                        // removeDownloadedTrack(track.id);
-                      } else {
-                        downloadTrack(track);
-                      }
-                    }}
-                    disabled={isDownloading === track.id}
-                  >
-                    {isDownloading === track.id ? (
-                      <Loader size={16} className="animate-spin" />
-                    ) : downloadedTracks.has(track.id) ? (
-                      <div className="relative">
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                      </div>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    )}
-                  </button>
-
-                  <button
-                    className="p-2 text-gray-500 hover:text-white"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      hapticFeedback.selection();
-                      setTrackToAction(track);
-                      setShowActionModal(true);
-                    }}
-                  >
-                    <MoreVertical size={16} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Load More Button */}
-        {searchState.results.length > 0 && searchState.hasMore && (
-          <div className="mt-6 flex justify-center">
-            <button
-              onClick={loadMore}
-              disabled={isLoadingMore}
-              className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
-            >
-              {isLoadingMore ? (
-                <>
-                  <Loader size={14} className="animate-spin" />
-                  <span>Загрузка...</span>
-                </>
-              ) : (
-                <span>Показать еще</span>
-              )}
-            </button>
+              );
+            })}
           </div>
-        )}
-      </div>
+
+          {/* Load More Button */}
+          {searchState.results.length > 0 && searchState.hasMore && (
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={loadMore}
+                disabled={isLoadingMore}
+                className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader size={14} className="animate-spin" />
+                    <span>Загрузка...</span>
+                  </>
+                ) : (
+                  <span>Показать еще</span>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Action Modal (Add to Playlist) */}
       {showActionModal && trackToAction && (

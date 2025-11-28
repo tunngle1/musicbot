@@ -29,6 +29,14 @@ class SearchResponse(BaseModel):
     count: int
 
 
+class RadioStation(BaseModel):
+    id: str
+    name: str
+    genre: str
+    url: str
+    image: str
+
+
 # Инициализация FastAPI
 app = FastAPI(
     title="Telegram Music API",
@@ -143,6 +151,32 @@ async def get_track(track_id: str):
         status_code=501,
         detail="Получение трека по ID пока не реализовано. Используйте поиск."
     )
+
+
+@app.get("/api/radio")
+async def get_radio_stations():
+    """
+    Получение списка радиостанций
+    
+    Returns:
+        Список доступных радиостанций
+    """
+    try:
+        stations = parser.get_radio_stations()
+        
+        # Конвертируем в Pydantic модели
+        station_models = [RadioStation(**station) for station in stations]
+        
+        return {
+            "results": station_models,
+            "count": len(station_models)
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при получении радиостанций: {str(e)}"
+        )
 
 
 @app.get("/api/genre/{genre_id}")

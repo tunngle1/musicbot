@@ -178,6 +178,30 @@ export const checkHealth = async (): Promise<boolean> => {
 };
 
 /**
+ * Получить список радиостанций
+ */
+export const getRadioStations = async (): Promise<any[]> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/radio`, {
+            headers: {
+                'tuna-skip-browser-warning': 'true'
+            }
+        });
+
+        if (!response.ok) {
+            const error: ApiError = await response.json();
+            throw new Error(error.detail || 'Ошибка при получении радиостанций');
+        }
+
+        const data = await response.json();
+        return data.results;
+    } catch (error) {
+        console.error('Get radio stations error:', error);
+        throw error;
+    }
+};
+
+/**
  * Форматирование времени из секунд в MM:SS
  */
 export const formatDuration = (seconds: number): string => {
@@ -185,3 +209,4 @@ export const formatDuration = (seconds: number): string => {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
+
