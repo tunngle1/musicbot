@@ -30,6 +30,9 @@ interface PlayerContextType {
   toggleShuffle: () => void;
   downloadTrack: (track: Track) => void;
   removeDownloadedTrack: (trackId: string) => void;
+  deletePlaylist: (id: string) => void;
+  removeFromPlaylist: (playlistId: string, trackId: string) => void;
+  updatePlaylist: (playlist: Playlist, coverBlob?: Blob) => void;
 
   // Search
   searchState: {
@@ -104,6 +107,16 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const queueRef = useRef(queue);
+  const currentTrackRef = useRef(currentTrack);
+  const repeatModeRef = useRef(repeatMode);
+  const isShuffleRef = useRef(isShuffle);
+
+  // Sync refs with state
+  useEffect(() => { queueRef.current = queue; }, [queue]);
+  useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
+  useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
+  useEffect(() => { isShuffleRef.current = isShuffle; }, [isShuffle]);
 
   // Auth and Load Data
   useEffect(() => {
@@ -201,16 +214,60 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
     const handleLoadedMetadata = () => setDuration(audio.duration);
     const handleEnded = () => {
-      // Use current repeatMode value from state
-      setRepeatMode(currentRepeatMode => {
-        if (currentRepeatMode === 'one') {
-          audio.currentTime = 0;
-          audio.play();
-        } else {
-          nextTrack();
+      const currentRepeatMode = repeatModeRef.current;
+      const currentQueue = queueRef.current;
+      const currentTrackVal = currentTrackRef.current;
+      const isShuffleVal = isShuffleRef.current;
+      const audio = audioRef.current;
+
+      if (!audio) return;
+
+      if (currentRepeatMode === 'one') {
+        audio.currentTime = 0;
+        audio.play();
+      } else {
+        // Logic from nextTrack, but using refs
+        if (!currentTrackVal || currentQueue.length === 0) return;
+
+        if (isShuffleVal) {
+          const randomIndex = Math.floor(Math.random() * currentQueue.length);
+          // We can't call playTrack directly because it's not in ref, but we can call the function from scope?
+          // Yes, playTrack is stable? No, playTrack depends on state setters.
+          // But handleEnded is created ONCE. playTrack is recreated.
+          // So we CANNOT call playTrack from here if we want fresh closure.
+          // We need to trigger next track via state update or something.
+          // Actually, we can just call setQueue/setCurrentTrack directly?
+          // Or better: use a ref for playTrack?
+          // Or just emit an event?
+
+          // Let's use a workaround: call a method that is updated in a ref?
+          // Or just duplicate logic:
+          const nextTrack = currentQueue[randomIndex];
+          setCurrentTrack(nextTrack);
+          setCurrentRadio(null);
+          setIsRadioMode(false);
+          setIsPlaying(true);
+          return;
         }
-        return currentRepeatMode; // Don't change the mode
-      });
+
+        const currentIndex = currentQueue.findIndex(t => t.id === currentTrackVal.id);
+        if (currentIndex < currentQueue.length - 1) {
+          const nextTrack = currentQueue[currentIndex + 1];
+          setCurrentTrack(nextTrack);
+          setCurrentRadio(null);
+          setIsRadioMode(false);
+          setIsPlaying(true);
+        } else if (currentRepeatMode === 'all') {
+          const nextTrack = currentQueue[0];
+          setCurrentTrack(nextTrack);
+          setCurrentRadio(null);
+          setIsRadioMode(false);
+          setIsPlaying(true);
+        } else {
+          setIsPlaying(false);
+          audio.currentTime = 0;
+        }
+      }
     };
     const handleError = (e: Event) => {
       console.error("Audio error:", e);
@@ -459,6 +516,44 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }));
   };
 
+  const deletePlaylist = async (id: string) => {
+    try {
+      await storage.deletePlaylist(id);
+      setPlaylists(prev => prev.filter(p => p.id !== id));
+    } catch (e) {
+      console.error("Failed to delete playlist:", e);
+    }
+  };
+
+  const removeFromPlaylist = async (playlistId: string, trackId: string) => {
+    setPlaylists(prev => prev.map(pl => {
+      if (pl.id === playlistId) {
+        const updatedPlaylist = { ...pl, trackIds: pl.trackIds.filter(id => id !== trackId) };
+        storage.updatePlaylist(updatedPlaylist).catch(err => console.error("Failed to update playlist:", err));
+        return updatedPlaylist;
+      }
+      return pl;
+    }));
+  };
+
+  const updatePlaylist = async (playlist: Playlist, coverBlob?: Blob) => {
+    try {
+      await storage.savePlaylist(playlist, coverBlob); // savePlaylist handles update logic
+      setPlaylists(prev => prev.map(p => {
+        if (p.id === playlist.id) {
+          // If we have a new blob, we should update the URL in state
+          if (coverBlob) {
+            return { ...playlist, coverUrl: URL.createObjectURL(coverBlob) };
+          }
+          return playlist;
+        }
+        return p;
+      }));
+    } catch (e) {
+      console.error("Failed to update playlist:", e);
+    }
+  };
+
   const toggleRepeat = () => {
     setRepeatMode(prev => {
       if (prev === 'none') return 'all';
@@ -555,6 +650,9 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       toggleShuffle,
       downloadTrack,
       removeDownloadedTrack,
+      deletePlaylist,
+      removeFromPlaylist,
+      updatePlaylist,
       searchState,
       setSearchState,
       resetSearch,

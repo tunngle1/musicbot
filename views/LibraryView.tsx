@@ -23,8 +23,9 @@ const LibraryView: React.FC = () => {
 
   const loadLibraryTracks = async () => {
     const tracks = await storage.getAllTracks();
-    // Сортируем: сначала новые
-    setLibraryTracks(tracks.reverse());
+    // Filter only downloaded tracks (isLocal = true) and sort by newest
+    const downloadedTracks = tracks.filter(t => t.isLocal);
+    setLibraryTracks(downloadedTracks.reverse());
   };
 
   const loadStorageInfo = async () => {

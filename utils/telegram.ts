@@ -69,6 +69,17 @@ interface TelegramWebApp {
     close: () => void;
     enableClosingConfirmation: () => void;
     disableClosingConfirmation: () => void;
+    showPopup: (params: {
+        title?: string;
+        message: string;
+        buttons?: {
+            id?: string;
+            type?: 'default' | 'ok' | 'close' | 'cancel' | 'destructive';
+            text?: string;
+        }[];
+    }, callback?: (buttonId: string) => void) => void;
+    showAlert: (message: string, callback?: () => void) => void;
+    showConfirm: (message: string, callback?: (confirmed: boolean) => void) => void;
 }
 
 declare global {
