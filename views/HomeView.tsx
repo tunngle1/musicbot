@@ -147,8 +147,8 @@ const HomeView: React.FC = () => {
         </div>
       )}
 
-      {/* Genres Section - Only show when not searching */}
-      {!searchState.query.trim() && (
+      {/* Genres Section - Only show when not searching and no results */}
+      {!searchState.query.trim() && searchState.results.length === 0 && !searchState.isSearching && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-100">Жанры</h3>
           <div className="grid grid-cols-2 gap-3">
@@ -193,8 +193,8 @@ const HomeView: React.FC = () => {
         </div>
       )}
 
-      {/* Artist Recommendations - Only show when playing and not searching */}
-      {!searchState.query.trim() && currentTrack && (
+      {/* Artist Recommendations - Only show when playing and not searching and no results */}
+      {!searchState.query.trim() && searchState.results.length === 0 && !searchState.isSearching && currentTrack && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-100">Рекомендации</h3>
           <button
