@@ -15,11 +15,23 @@ const HomeView: React.FC = () => {
     downloadedTracks,
     isDownloading,
     togglePlay,
-    searchState,
-    setSearchState
-  } = usePlayer();
-
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [searchState, setSearchState] = useState<{
+      query: string;
+      results: Track[];
+      isSearching: boolean;
+      error: string | null;
+      page: number;
+      hasMore: boolean;
+      isArtistSearch: boolean; // New flag
+    }>({
+      query: '',
+      results: [],
+      isSearching: false,
+      error: null,
+      page: 1,
+      hasMore: true,
+      isArtistSearch: false
+    });
 
   const [showActionModal, setShowActionModal] = useState(false);
   const [trackToAction, setTrackToAction] = useState<Track | null>(null);
@@ -42,7 +54,7 @@ const HomeView: React.FC = () => {
       setSearchState(prev => ({ ...prev, isSearching: true, error: null, page: 1 }));
 
       try {
-        const results = await searchTracks(searchState.query, 20, 1);
+        const results = await searchTracks(searchState.query, 20, 1, searchState.isArtistSearch);
         setSearchState(prev => ({
           ...prev,
           results,
@@ -61,7 +73,7 @@ const HomeView: React.FC = () => {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [searchState.query, setSearchState]);
+  }, [searchState.query, searchState.isArtistSearch, setSearchState]);
 
   const loadMore = async () => {
     if (isLoadingMore || !searchState.hasMore) return;
@@ -70,7 +82,7 @@ const HomeView: React.FC = () => {
     const nextPage = searchState.page + 1;
 
     try {
-      const newResults = await searchTracks(searchState.query, 20, nextPage);
+      const newResults = await searchTracks(searchState.query, 20, nextPage, searchState.isArtistSearch);
 
       if (newResults.length === 0) {
         setSearchState(prev => ({ ...prev, hasMore: false }));
@@ -100,7 +112,7 @@ const HomeView: React.FC = () => {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
-    setSearchState(prev => ({ ...prev, query }));
+    setSearchState(prev => ({ ...prev, query, isArtistSearch: false }));
 
     if (query.trim().length > 2) {
       // Debounce search is handled by the useEffect above,
@@ -202,7 +214,7 @@ const HomeView: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-100">Рекомендации</h3>
           <button
             onClick={() => {
-              setSearchState(prev => ({ ...prev, query: currentTrack.artist }));
+              setSearchState(prev => ({ ...prev, query: currentTrack.artist, isArtistSearch: true }));
               hapticFeedback.light();
             }}
             className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors flex items-center space-x-4"

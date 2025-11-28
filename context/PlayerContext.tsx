@@ -35,15 +35,19 @@ interface PlayerContextType {
     query: string;
     results: Track[];
     isSearching: boolean;
+    error: string | null;
     page: number;
     hasMore: boolean;
+    isArtistSearch: boolean;
   };
   setSearchState: React.Dispatch<React.SetStateAction<{
     query: string;
     results: Track[];
     isSearching: boolean;
+    error: string | null;
     page: number;
     hasMore: boolean;
+    isArtistSearch: boolean;
   }>>;
   resetSearch: () => void;
 }
@@ -71,8 +75,10 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     query: '',
     results: [] as Track[],
     isSearching: false,
+    error: null as string | null,
     page: 1,
-    hasMore: true
+    hasMore: true,
+    isArtistSearch: false
   });
 
   const resetSearch = () => {
@@ -80,8 +86,10 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       query: '',
       results: [],
       isSearching: false,
+      error: null,
       page: 1,
-      hasMore: true
+      hasMore: true,
+      isArtistSearch: false
     });
   };
 

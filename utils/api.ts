@@ -27,13 +27,18 @@ interface ApiError {
 export const searchTracks = async (
     query: string,
     limit: number = 20,
-    page: number = 1
+    page: number = 1,
+    byArtist: boolean = false
 ): Promise<Track[]> => {
     try {
         const url = new URL(`${API_BASE_URL}/api/search`);
         url.searchParams.append('q', query);
         url.searchParams.append('limit', limit.toString());
         url.searchParams.append('page', page.toString());
+
+        if (byArtist) {
+            url.searchParams.append('by_artist', 'true');
+        }
 
         const response = await fetch(url.toString(), {
             headers: {
@@ -116,45 +121,30 @@ export const getGenreTracks = async (
     } catch (error) {
         console.error('Genre tracks error:', error);
         throw error;
+        const error: ApiError = await response.json();
+        throw new Error(error.detail || 'Ошибка при получении трека');
     }
-};
 
-/**
- * Получить информацию о треке по ID
- */
-export const getTrack = async (trackId: string): Promise<Track> => {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/track/${trackId}`, {
-            headers: {
-                'tuna-skip-browser-warning': 'true'
-            }
-        });
+    const track = await response.json();
 
-        if (!response.ok) {
-            const error: ApiError = await response.json();
-            throw new Error(error.detail || 'Ошибка при получении трека');
-        }
-
-        const track = await response.json();
-
-        let audioUrl = (track as any).url;
-        if (audioUrl && audioUrl.startsWith('/')) {
-            audioUrl = `${API_BASE_URL}${audioUrl}`;
-        }
-
-        return {
-            id: track.id,
-            title: track.title,
-            artist: track.artist,
-            coverUrl: (track as any).image,
-            audioUrl: audioUrl,
-            duration: track.duration,
-            isLocal: false
-        };
-    } catch (error) {
-        console.error('Get track error:', error);
-        throw error;
+    let audioUrl = (track as any).url;
+    if (audioUrl && audioUrl.startsWith('/')) {
+        audioUrl = `${API_BASE_URL}${audioUrl}`;
     }
+
+    return {
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        coverUrl: (track as any).image,
+        audioUrl: audioUrl,
+        duration: track.duration,
+        isLocal: false
+    };
+} catch (error) {
+    console.error('Get track error:', error);
+    throw error;
+}
 };
 
 /**

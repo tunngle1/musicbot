@@ -72,7 +72,8 @@ async def health_check():
 async def search_tracks(
     q: str = Query(..., description="Поисковый запрос", min_length=1),
     limit: int = Query(20, description="Максимальное количество результатов", ge=1, le=50),
-    page: int = Query(1, description="Номер страницы", ge=1)
+    page: int = Query(1, description="Номер страницы", ge=1),
+    by_artist: bool = Query(False, description="Искать только по исполнителю")
 ):
     """
     Поиск треков по запросу
@@ -80,6 +81,8 @@ async def search_tracks(
     Args:
         q: Поисковый запрос (название трека, исполнитель)
         limit: Максимальное количество результатов (1-50)
+        page: Номер страницы
+        by_artist: Если True, фильтрует результаты, оставляя только совпадения по исполнителю
         
     Returns:
         Список найденных треков
@@ -87,6 +90,14 @@ async def search_tracks(
     try:
         # Выполняем поиск (синхронно, Selenium)
         tracks = parser.search(q, limit=limit, page=page)
+        
+        # Фильтрация по артисту если запрошено
+        if by_artist:
+            query_lower = q.lower()
+            tracks = [
+                track for track in tracks 
+                if query_lower in track['artist'].lower()
+            ]
         
         # Конвертируем в Pydantic модели и оборачиваем URL в прокси
         track_models = []
