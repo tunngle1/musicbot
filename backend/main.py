@@ -70,6 +70,17 @@ class CacheStats(BaseModel):
     ttl_seconds: int
     sample_keys: List[str]
 
+class UserListItem(BaseModel):
+    id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    is_admin: bool
+    is_premium: bool
+
+class UserListResponse(BaseModel):
+    users: List[UserListItem]
+
 
 # Инициализация FastAPI
 app = FastAPI(
@@ -175,6 +186,36 @@ async def get_stats(user_id: int = Query(...), db: Session = Depends(get_db)):
         new_users_today=new_today
     )
 
+@app.get("/api/admin/users", response_model=UserListResponse)
+async def get_users(user_id: int = Query(...), filter_type: str = Query("all"), db: Session = Depends(get_db)):
+    """
+    Get list of users (only for admins)
+    filter_type: 'all', 'premium', 'admin'
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = db.query(User)
+    
+    if filter_type == "premium":
+        query = query.filter(User.is_premium == True)
+    elif filter_type == "admin":
+        query = query.filter(User.is_admin == True)
+    
+    users = query.all()
+    
+    return UserListResponse(
+        users=[UserListItem(
+            id=u.id,
+            username=u.username,
+            first_name=u.first_name,
+            last_name=u.last_name,
+            is_admin=u.is_admin,
+            is_premium=u.is_premium
+        ) for u in users]
+    )
+
 @app.post("/api/admin/grant")
 async def grant_rights(
     request: GrantRequest, 
@@ -182,9 +223,15 @@ async def grant_rights(
     db: Session = Depends(get_db)
 ):
     """Выдача прав (только для админов)"""
+    SUPER_ADMIN_ID = 414153884  # Super admin cannot be modified
+    
     admin = db.query(User).filter(User.id == admin_id).first()
     if not admin or not admin.is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Protect super admin
+    if request.user_id == SUPER_ADMIN_ID:
+        raise HTTPException(status_code=403, detail="Cannot modify super admin")
     
     target_user = db.query(User).filter(User.id == request.user_id).first()
     if not target_user:
@@ -195,10 +242,43 @@ async def grant_rights(
     if request.is_admin is not None:
         target_user.is_admin = request.is_admin
     
+    # Check if premium is being revoked
+    was_premium = target_user.is_premium
+    
     if request.is_premium is not None:
         target_user.is_premium = request.is_premium
         
     db.commit()
+    
+    # If premium was revoked, delete all downloaded messages
+    if was_premium and request.is_premium == False and BOT_TOKEN:
+        try:
+            messages = db.query(DownloadedMessage).filter(DownloadedMessage.user_id == request.user_id).all()
+            
+            if messages:
+                telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/deleteMessage"
+                deleted_count = 0
+                
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    for msg in messages:
+                        try:
+                            response = await client.post(telegram_url, json={
+                                'chat_id': msg.chat_id,
+                                'message_id': msg.message_id
+                            })
+                            if response.status_code == 200:
+                                deleted_count += 1
+                        except Exception as e:
+                            print(f"Failed to delete message {msg.message_id}: {e}")
+                
+                # Delete from database
+                db.query(DownloadedMessage).filter(DownloadedMessage.user_id == request.user_id).delete()
+                db.commit()
+                
+                print(f"Auto-deleted {deleted_count} messages for user {request.user_id}")
+        except Exception as e:
+            print(f"Error auto-deleting messages: {e}")
+    
     return {"status": "ok", "message": f"Rights updated for user {request.user_id}"}
 
 # --- Cache Admin Endpoints ---

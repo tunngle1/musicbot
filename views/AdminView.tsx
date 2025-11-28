@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, Star, Activity, Check, AlertCircle, ArrowLeft, Database, RefreshCw, Trash2 } from 'lucide-react';
+import { Shield, Users, Star, Activity, Check, AlertCircle, ArrowLeft, Database, RefreshCw, Trash2, Crown, UserX } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { API_BASE_URL } from '../constants';
+
+const SUPER_ADMIN_ID = 414153884;
 
 interface UserStats {
     total_users: number;
@@ -19,14 +21,28 @@ interface CacheStats {
     sample_keys: string[];
 }
 
+interface UserListItem {
+    id: number;
+    username: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    is_admin: boolean;
+    is_premium: boolean;
+}
+
 interface AdminViewProps {
     onBack: () => void;
 }
 
+type TabType = 'overview' | 'premium' | 'admins';
+
 const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
     const { user } = usePlayer();
+    const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [stats, setStats] = useState<UserStats | null>(null);
     const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
+    const [premiumUsers, setPremiumUsers] = useState<UserListItem[]>([]);
+    const [adminUsers, setAdminUsers] = useState<UserListItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [targetId, setTargetId] = useState('');
     const [grantType, setGrantType] = useState<'admin' | 'premium'>('premium');
@@ -41,6 +57,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
         loadData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
+
+    useEffect(() => {
+        if (activeTab === 'premium' && premiumUsers.length === 0) {
+            loadPremiumUsers();
+        } else if (activeTab === 'admins' && adminUsers.length === 0) {
+            loadAdminUsers();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab]);
 
     const loadData = async () => {
         setIsLoading(true);
@@ -69,6 +94,30 @@ const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
             }
         } catch (error) {
             console.error('Failed to load cache stats:', error);
+        }
+    };
+
+    const loadPremiumUsers = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/users?user_id=${user?.id}&filter_type=premium`);
+            if (response.ok) {
+                const data = await response.json();
+                setPremiumUsers(data.users);
+            }
+        } catch (error) {
+            console.error('Failed to load premium users:', error);
+        }
+    };
+
+    const loadAdminUsers = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/users?user_id=${user?.id}&filter_type=admin`);
+            if (response.ok) {
+                const data = await response.json();
+                setAdminUsers(data.users);
+            }
+        } catch (error) {
+            console.error('Failed to load admin users:', error);
         }
     };
 
@@ -107,15 +156,57 @@ const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
             if (response.ok) {
                 setMessage({ type: 'success', text: `Права успешно обновлены для ID ${targetId}` });
                 setTargetId('');
-                loadStats(); // Refresh stats
+                loadStats();
             } else {
-                setMessage({ type: 'error', text: 'Ошибка при обновлении прав' });
+                const errorData = await response.json();
+                setMessage({ type: 'error', text: errorData.detail || 'Ошибка при обновлении прав' });
             }
         } catch (error) {
             setMessage({ type: 'error', text: 'Ошибка сети' });
         }
 
         setTimeout(() => setMessage(null), 3000);
+    };
+
+    const handleRemoveRight = async (userId: number, rightType: 'admin' | 'premium') => {
+        if (!user) return;
+
+        try {
+            const body: any = { user_id: userId };
+            if (rightType === 'admin') body.is_admin = false;
+            if (rightType === 'premium') body.is_premium = false;
+
+            const response = await fetch(`${API_BASE_URL}/api/admin/grant?admin_id=${user.id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (response.ok) {
+                setMessage({ type: 'success', text: `Права успешно отозваны` });
+                // Refresh lists
+                if (rightType === 'premium') {
+                    loadPremiumUsers();
+                } else {
+                    loadAdminUsers();
+                }
+                loadStats();
+            } else {
+                const errorData = await response.json();
+                setMessage({ type: 'error', text: errorData.detail || 'Ошибка при удалении прав' });
+            }
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Ошибка сети' });
+        }
+
+        setTimeout(() => setMessage(null), 3000);
+    };
+
+    const getUserDisplayName = (user: UserListItem) => {
+        if (user.first_name || user.last_name) {
+            return `${user.first_name || ''} ${user.last_name || ''}`.trim();
+        }
+        return user.username || `User ${user.id}`;
     };
 
     if (!user?.is_admin) return null;
@@ -144,157 +235,327 @@ const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                 </button>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                    <div className="flex items-center gap-2 text-gray-400 mb-2">
-                        <Users size={16} />
-                        <span className="text-xs font-medium">Всего пользователей</span>
-                    </div>
-                    <div className="text-2xl font-bold text-white">
-                        {isLoading ? '...' : stats?.total_users}
-                    </div>
-                </div>
-
-                <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                    <div className="flex items-center gap-2 text-yellow-500 mb-2">
-                        <Star size={16} />
-                        <span className="text-xs font-medium text-gray-400">Premium</span>
-                    </div>
-                    <div className="text-2xl font-bold text-white">
-                        {isLoading ? '...' : stats?.premium_users}
-                    </div>
-                </div>
-
-                <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                    <div className="flex items-center gap-2 text-blue-500 mb-2">
-                        <Shield size={16} />
-                        <span className="text-xs font-medium text-gray-400">Админы</span>
-                    </div>
-                    <div className="text-2xl font-bold text-white">
-                        {isLoading ? '...' : stats?.admin_users}
-                    </div>
-                </div>
-
-                <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                    <div className="flex items-center gap-2 text-green-500 mb-2">
-                        <Activity size={16} />
-                        <span className="text-xs font-medium text-gray-400">Новые сегодня</span>
-                    </div>
-                    <div className="text-2xl font-bold text-white">
-                        {isLoading ? '...' : stats?.new_users_today}
-                    </div>
-                </div>
+            {/* Tabs */}
+            <div className="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
+                <button
+                    onClick={() => setActiveTab('overview')}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${activeTab === 'overview'
+                            ? 'bg-blue-500 text-white'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                >
+                    Обзор
+                </button>
+                <button
+                    onClick={() => setActiveTab('premium')}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${activeTab === 'premium'
+                            ? 'bg-yellow-500 text-white'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                >
+                    Premium
+                </button>
+                <button
+                    onClick={() => setActiveTab('admins')}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${activeTab === 'admins'
+                            ? 'bg-blue-500 text-white'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                >
+                    Админы
+                </button>
             </div>
 
-            {/* Cache Stats */}
-            <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                        <Database size={18} className="text-purple-400" />
-                        Кэширование
-                    </h3>
-                    <button
-                        onClick={handleResetCache}
-                        className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/30 transition-colors flex items-center gap-1"
-                    >
-                        <Trash2 size={14} />
-                        Сбросить
-                    </button>
-                </div>
+            {/* Overview Tab */}
+            {activeTab === 'overview' && (
+                <>
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                            <div className="flex items-center gap-2 text-gray-400 mb-2">
+                                <Users size={16} />
+                                <span className="text-xs font-medium">Всего пользователей</span>
+                            </div>
+                            <div className="text-2xl font-bold text-white">
+                                {isLoading ? '...' : stats?.total_users}
+                            </div>
+                        </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-black/20 p-3 rounded-xl">
-                        <div className="text-xs text-gray-400 mb-1">Записей в кэше</div>
-                        <div className="text-xl font-bold text-white">{cacheStats?.total_entries || 0}</div>
-                    </div>
-                    <div className="bg-black/20 p-3 rounded-xl">
-                        <div className="text-xs text-gray-400 mb-1">Эффективность (Hit Ratio)</div>
-                        <div className="text-xl font-bold text-green-400">
-                            {((cacheStats?.hit_ratio || 0) * 100).toFixed(1)}%
+                        <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                            <div className="flex items-center gap-2 text-yellow-500 mb-2">
+                                <Star size={16} />
+                                <span className="text-xs font-medium text-gray-400">Premium</span>
+                            </div>
+                            <div className="text-2xl font-bold text-white">
+                                {isLoading ? '...' : stats?.premium_users}
+                            </div>
+                        </div>
+
+                        <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                            <div className="flex items-center gap-2 text-blue-500 mb-2">
+                                <Shield size={16} />
+                                <span className="text-xs font-medium text-gray-400">Админы</span>
+                            </div>
+                            <div className="text-2xl font-bold text-white">
+                                {isLoading ? '...' : stats?.admin_users}
+                            </div>
+                        </div>
+
+                        <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                            <div className="flex items-center gap-2 text-green-500 mb-2">
+                                <Activity size={16} />
+                                <span className="text-xs font-medium text-gray-400">Новые сегодня</span>
+                            </div>
+                            <div className="text-2xl font-bold text-white">
+                                {isLoading ? '...' : stats?.new_users_today}
+                            </div>
                         </div>
                     </div>
-                    <div className="bg-black/20 p-3 rounded-xl">
-                        <div className="text-xs text-gray-400 mb-1">Попаданий (Hits)</div>
-                        <div className="text-xl font-bold text-blue-400">{cacheStats?.cache_hits || 0}</div>
+
+                    {/* Cache Stats */}
+                    <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                <Database size={18} className="text-purple-400" />
+                                Кэширование
+                            </h3>
+                            <button
+                                onClick={handleResetCache}
+                                className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/30 transition-colors flex items-center gap-1"
+                            >
+                                <Trash2 size={14} />
+                                Сбросить
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="bg-black/20 p-3 rounded-xl">
+                                <div className="text-xs text-gray-400 mb-1">Записей в кэше</div>
+                                <div className="text-xl font-bold text-white">{cacheStats?.total_entries || 0}</div>
+                            </div>
+                            <div className="bg-black/20 p-3 rounded-xl">
+                                <div className="text-xs text-gray-400 mb-1">Эффективность (Hit Ratio)</div>
+                                <div className="text-xl font-bold text-green-400">
+                                    {((cacheStats?.hit_ratio || 0) * 100).toFixed(1)}%
+                                </div>
+                            </div>
+                            <div className="bg-black/20 p-3 rounded-xl">
+                                <div className="text-xs text-gray-400 mb-1">Попаданий (Hits)</div>
+                                <div className="text-xl font-bold text-blue-400">{cacheStats?.cache_hits || 0}</div>
+                            </div>
+                            <div className="bg-black/20 p-3 rounded-xl">
+                                <div className="text-xs text-gray-400 mb-1">Промахов (Misses)</div>
+                                <div className="text-xl font-bold text-orange-400">{cacheStats?.cache_misses || 0}</div>
+                            </div>
+                        </div>
+
+                        <div className="text-xs text-gray-500">
+                            TTL: {cacheStats?.ttl_seconds} сек.
+                        </div>
                     </div>
-                    <div className="bg-black/20 p-3 rounded-xl">
-                        <div className="text-xs text-gray-400 mb-1">Промахов (Misses)</div>
-                        <div className="text-xl font-bold text-orange-400">{cacheStats?.cache_misses || 0}</div>
+
+                    {/* Management Form */}
+                    <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+                        <h3 className="text-lg font-semibold text-white mb-4">Управление правами</h3>
+
+                        <form onSubmit={handleGrant} className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-1">Telegram ID пользователя</label>
+                                <input
+                                    type="text"
+                                    value={targetId}
+                                    onChange={(e) => setTargetId(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="Например: 123456789"
+                                    className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500 transition-colors"
+                                />
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setGrantType('premium')}
+                                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${grantType === 'premium'
+                                            ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50'
+                                            : 'bg-white/5 text-gray-400'
+                                        }`}
+                                >
+                                    Premium
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setGrantType('admin')}
+                                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${grantType === 'admin'
+                                            ? 'bg-blue-500/20 text-blue-500 border border-blue-500/50'
+                                            : 'bg-white/5 text-gray-400'
+                                        }`}
+                                >
+                                    Admin
+                                </button>
+                            </div>
+
+                            <div className="flex items-center justify-between bg-black/20 p-3 rounded-xl">
+                                <span className="text-sm text-gray-300">Статус</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setGrantValue(!grantValue)}
+                                    className={`relative w-12 h-6 rounded-full transition-colors ${grantValue ? 'bg-green-500' : 'bg-gray-600'
+                                        }`}
+                                >
+                                    <div
+                                        className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${grantValue ? 'translate-x-6' : 'translate-x-0'
+                                            }`}
+                                    />
+                                </button>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={!targetId}
+                                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white font-semibold transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Check size={18} />
+                                Применить изменения
+                            </button>
+                        </form>
+
+                        {message && (
+                            <div
+                                className={`mt-4 p-3 rounded-xl flex items-center gap-2 text-sm ${message.type === 'success'
+                                        ? 'bg-green-500/20 text-green-400'
+                                        : 'bg-red-500/20 text-red-400'
+                                    }`}
+                            >
+                                {message.type === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}
+                                {message.text}
+                            </div>
+                        )}
                     </div>
+                </>
+            )}
+
+            {/* Premium Users Tab */}
+            {activeTab === 'premium' && (
+                <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <Star className="text-yellow-500" />
+                        Premium пользователи ({premiumUsers.length})
+                    </h3>
+
+                    {premiumUsers.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400">
+                            Нет пользователей с премиумом
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {premiumUsers.map((u) => (
+                                <div
+                                    key={u.id}
+                                    className="bg-black/20 p-4 rounded-xl flex items-center justify-between"
+                                >
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <div className="text-white font-medium">{getUserDisplayName(u)}</div>
+                                            {u.id === SUPER_ADMIN_ID && (
+                                                <span className="px-2 py-0.5 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                                    <Crown size={12} />
+                                                    SUPER ADMIN
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-sm text-gray-400">
+                                            ID: {u.id}
+                                            {u.username && ` • @${u.username}`}
+                                        </div>
+                                    </div>
+
+                                    {u.id !== SUPER_ADMIN_ID && (
+                                        <button
+                                            onClick={() => handleRemoveRight(u.id, 'premium')}
+                                            className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors"
+                                            title="Удалить премиум"
+                                        >
+                                            <UserX size={18} />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {message && (
+                        <div
+                            className={`mt-4 p-3 rounded-xl flex items-center gap-2 text-sm ${message.type === 'success'
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : 'bg-red-500/20 text-red-400'
+                                }`}
+                        >
+                            {message.type === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}
+                            {message.text}
+                        </div>
+                    )}
                 </div>
+            )}
 
-                <div className="text-xs text-gray-500">
-                    TTL: {cacheStats?.ttl_seconds} сек.
+            {/* Admin Users Tab */}
+            {activeTab === 'admins' && (
+                <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <Shield className="text-blue-500" />
+                        Администраторы ({adminUsers.length})
+                    </h3>
+
+                    {adminUsers.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400">Нет администраторов</div>
+                    ) : (
+                        <div className="space-y-3">
+                            {adminUsers.map((u) => (
+                                <div
+                                    key={u.id}
+                                    className="bg-black/20 p-4 rounded-xl flex items-center justify-between"
+                                >
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <div className="text-white font-medium">{getUserDisplayName(u)}</div>
+                                            {u.id === SUPER_ADMIN_ID && (
+                                                <span className="px-2 py-0.5 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                                                    <Crown size={12} />
+                                                    SUPER ADMIN
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-sm text-gray-400">
+                                            ID: {u.id}
+                                            {u.username && ` • @${u.username}`}
+                                        </div>
+                                    </div>
+
+                                    {u.id !== SUPER_ADMIN_ID && (
+                                        <button
+                                            onClick={() => handleRemoveRight(u.id, 'admin')}
+                                            className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors"
+                                            title="Удалить права админа"
+                                        >
+                                            <UserX size={18} />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {message && (
+                        <div
+                            className={`mt-4 p-3 rounded-xl flex items-center gap-2 text-sm ${message.type === 'success'
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : 'bg-red-500/20 text-red-400'
+                                }`}
+                        >
+                            {message.type === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}
+                            {message.text}
+                        </div>
+                    )}
                 </div>
-            </div>
-
-            {/* Management Form */}
-            <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
-                <h3 className="text-lg font-semibold text-white mb-4">Управление правами</h3>
-
-                <form onSubmit={handleGrant} className="space-y-4">
-                    <div>
-                        <label className="block text-sm text-gray-400 mb-1">Telegram ID пользователя</label>
-                        <input
-                            type="text"
-                            value={targetId}
-                            onChange={(e) => setTargetId(e.target.value.replace(/\D/g, ''))}
-                            placeholder="Например: 123456789"
-                            className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500 transition-colors"
-                        />
-                    </div>
-
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setGrantType('premium')}
-                            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${grantType === 'premium' ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50' : 'bg-white/5 text-gray-400'
-                                }`}
-                        >
-                            Premium
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setGrantType('admin')}
-                            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${grantType === 'admin' ? 'bg-blue-500/20 text-blue-500 border border-blue-500/50' : 'bg-white/5 text-gray-400'
-                                }`}
-                        >
-                            Admin
-                        </button>
-                    </div>
-
-                    <div className="flex items-center justify-between bg-black/20 p-3 rounded-xl">
-                        <span className="text-sm text-gray-300">Статус</span>
-                        <button
-                            type="button"
-                            onClick={() => setGrantValue(!grantValue)}
-                            className={`relative w-12 h-6 rounded-full transition-colors ${grantValue ? 'bg-green-500' : 'bg-gray-600'
-                                }`}
-                        >
-                            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${grantValue ? 'translate-x-6' : 'translate-x-0'
-                                }`} />
-                        </button>
-                    </div>
-
-                    <button
-                        type="submit"
-                        disabled={!targetId}
-                        className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white font-semibold transition-colors flex items-center justify-center gap-2"
-                    >
-                        <Check size={18} />
-                        Применить изменения
-                    </button>
-                </form>
-
-                {message && (
-                    <div className={`mt-4 p-3 rounded-xl flex items-center gap-2 text-sm ${message.type === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                        }`}>
-                        {message.type === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}
-                        {message.text}
-                    </div>
-                )}
-            </div>
+            )}
         </div>
     );
 };
