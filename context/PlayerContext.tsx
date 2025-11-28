@@ -146,8 +146,28 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         console.log("Loading data from storage...");
         // ... existing loading logic ...
         const tracks = await storage.getAllTracks();
-        const ids = new Set(tracks.map(t => t.id));
-        setDownloadedTracks(ids);
+
+        // 1. Set downloaded tracks (only those with audio)
+        const downloadedIds = new Set(tracks.filter(t => t.isLocal).map(t => t.id));
+        setDownloadedTracks(downloadedIds);
+
+        // 2. Hydrate allTracks with loaded tracks (merging with mocks/defaults)
+        setAllTracks(prev => {
+          const loadedMap = new Map(tracks.map(t => [t.id, t]));
+          // We want to keep MOCK_TRACKS but override them if we have a local version (e.g. with blob)
+          // And append any new tracks from storage
+
+          const merged = [...prev];
+          // Update existing
+          for (let i = 0; i < merged.length; i++) {
+            if (loadedMap.has(merged[i].id)) {
+              merged[i] = loadedMap.get(merged[i].id)!;
+              loadedMap.delete(merged[i].id);
+            }
+          }
+          // Add remaining (new) tracks
+          return [...merged, ...Array.from(loadedMap.values())];
+        });
 
         const savedPlaylists = await storage.getAllPlaylists();
         if (savedPlaylists.length > 0) {

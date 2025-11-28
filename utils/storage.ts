@@ -76,13 +76,11 @@ class StorageService {
     async getAllTracks(): Promise<Track[]> {
         const db = await this.dbPromise;
         const tracks = await db.getAllFromIndex('tracks', 'by-date');
-        // Return only tracks that have audioBlob (downloaded)
-        return tracks
-            .filter(t => !!t.audioBlob)
-            .map(({ audioBlob, coverBlob, ...track }) => ({
-                ...track,
-                isLocal: true
-            }));
+        // Return all tracks (both downloaded and metadata-only)
+        return tracks.map(({ audioBlob, coverBlob, ...track }) => ({
+            ...track,
+            isLocal: !!audioBlob
+        }));
     }
 
     async deleteTrack(id: string): Promise<void> {
