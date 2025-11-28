@@ -200,8 +200,11 @@ async def stream_audio(request: Request, url: str = Query(..., description="URL 
     client = httpx.AsyncClient(follow_redirects=True, timeout=timeout)
     
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Referer': 'https://rus.hitmotop.com/',
+        'Accept': '*/*',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Origin': 'https://rus.hitmotop.com',
     }
     
     range_header = request.headers.get("range")
