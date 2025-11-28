@@ -26,7 +26,7 @@ const HomeView: React.FC = () => {
   const { playlists, addToPlaylist } = usePlayer();
 
   // Отображаемые треки: результаты поиска или все треки
-  const displayTracks = searchState.query.trim() ? searchState.results : allTracks;
+  const displayTracks = searchState.results.length > 0 ? searchState.results : (searchState.query.trim() ? [] : allTracks);
 
   // Поиск с debounce
   useEffect(() => {
