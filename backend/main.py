@@ -755,39 +755,31 @@ class YouTubeRequest(BaseModel):
 @app.post("/api/youtube/info", response_model=Track)
 async def get_youtube_info(request: YouTubeRequest):
     """
-    Get track info from YouTube URL using Cobalt API for audio and page scraping for metadata
+    Get track info using NoEmbed for metadata and Cobalt API for audio
     """
     try:
-        # 1. Scrape Metadata (Title, Artist, Thumbnail)
+        # 1. Get Metadata via NoEmbed (Reliable, no scraping needed)
         async with httpx.AsyncClient(timeout=10.0) as client:
-            page_response = await client.get(request.url)
-            page_content = page_response.text
-            
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(page_content, 'html.parser')
-        
-        title = soup.find("meta", property="og:title")
-        title = title["content"] if title else "Unknown Title"
-        
-        image = soup.find("meta", property="og:image")
-        thumbnail = image["content"] if image else ""
-        
-        # Duration is harder to scrape reliably without parsing JSON in scripts, 
-        # but we can try or default to 0.
-        duration = 0
+            try:
+                oembed_response = await client.get(f"https://noembed.com/embed?url={request.url}")
+                metadata = oembed_response.json()
+            except Exception as e:
+                print(f"Metadata fetch error: {e}")
+                metadata = {}
+
+        title = metadata.get("title", "Unknown Title")
+        artist = metadata.get("author_name", "Unknown Artist")
+        thumbnail = metadata.get("thumbnail_url", "")
         
         # Clean up title
         clean_title = title.replace('(Official Video)', '').replace('[Official Video]', '').strip()
         
-        # Try to parse Artist - Title
+        # Try to parse Artist - Title if author is generic (like "Vevo") or just to be safe
         if '-' in clean_title:
             parts = clean_title.split('-', 1)
             artist = parts[0].strip()
             track_title = parts[1].strip()
         else:
-            # Try to find channel name
-            author_tag = soup.find("link", itemprop="name")
-            artist = author_tag["content"] if author_tag else "Unknown Artist"
             track_title = clean_title
 
         # 2. Get Audio URL from Cobalt API
@@ -808,7 +800,6 @@ async def get_youtube_info(request: YouTubeRequest):
             cobalt_response = await client.post("https://api.cobalt.tools/api/json", json=cobalt_body, headers=cobalt_headers)
             
             if cobalt_response.status_code != 200:
-                # Fallback to another instance if needed, or just raise error
                 print(f"Cobalt API error: {cobalt_response.text}")
                 raise Exception("Cobalt API unavailable")
                 
@@ -827,7 +818,7 @@ async def get_youtube_info(request: YouTubeRequest):
             id=f"yt_{video_id}",
             title=track_title,
             artist=artist,
-            duration=duration,
+            duration=0, # Noembed doesn't return duration usually
             url=audio_url,
             image=thumbnail
         )
