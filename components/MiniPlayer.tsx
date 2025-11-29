@@ -43,44 +43,15 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
         )}
       </div>
 
-      <div className="flex-1 min-w-0 pr-4">
-        <div onClick={onExpand}>
-          <MarqueeText
-            text={isRadioMode ? currentRadio?.name || '' : currentTrack?.title || ''}
-            className="text-white text-sm font-bold text-glow"
-          />
-        </div>
-        <div
-          onClick={(e) => {
-            if (!isRadioMode && currentTrack) {
-              e.stopPropagation();
-
-              // Split artists by comma and filter
-              const artists = currentTrack.artist.split(',').map(a => a.trim()).filter(a => a);
-
-              if (artists.length > 1) {
-                // Multiple artists - show selector
-                setShowArtistSelector(true);
-              } else {
-                // Single artist - search directly
-                onExpand();
-                setSearchState(prev => ({
-                  ...prev,
-                  query: currentTrack.artist,
-                  isArtistSearch: true,
-                  results: [],
-                  genreId: null
-                }));
-              }
-            }
-          }}
-          className={!isRadioMode ? "cursor-pointer hover:text-blue-400 transition-colors" : ""}
-        >
-          <MarqueeText
-            text={isRadioMode ? currentRadio?.genre || '' : currentTrack?.artist || ''}
-            className="text-white/60 text-xs font-medium"
-          />
-        </div>
+      <div className="flex-1 min-w-0 pr-4" onClick={onExpand}>
+        <MarqueeText
+          text={isRadioMode ? currentRadio?.name || '' : currentTrack?.title || ''}
+          className="text-white text-sm font-bold text-glow"
+        />
+        <MarqueeText
+          text={isRadioMode ? currentRadio?.genre || '' : currentTrack?.artist || ''}
+          className="text-white/60 text-xs font-medium"
+        />
       </div>
 
       <button

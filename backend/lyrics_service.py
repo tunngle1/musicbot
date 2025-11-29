@@ -53,34 +53,15 @@ class LyricsService:
                 print(f"No results found for: {artist} - {title}")
                 return None
             
-            # Try to find the best match
-            best_match = None
-            artist_lower = artist.lower()
-            title_lower = title.lower()
-            
-            for hit in data['response']['hits'][:5]:  # Check first 5 results
-                result = hit['result']
-                result_artist = result.get('primary_artist', {}).get('name', '').lower()
-                result_title = result.get('title', '').lower()
-                
-                # Check if artist matches
-                if artist_lower in result_artist or result_artist in artist_lower:
-                    # Check if title matches
-                    if title_lower in result_title or result_title in title_lower:
-                        best_match = result
-                        break
-            
-            if not best_match:
-                # Fallback to first result
-                best_match = data['response']['hits'][0]['result']
-            
-            song_url = best_match.get('url')
+            # Get the first result
+            song_info = data['response']['hits'][0]['result']
+            song_url = song_info.get('url')
             
             if not song_url:
                 print("No song URL found")
                 return None
             
-            print(f"Found song: {best_match.get('title')} by {best_match.get('primary_artist', {}).get('name')}")
+            print(f"Found song: {song_info.get('title')} by {song_info.get('primary_artist', {}).get('name')}")
             
             # 2. Scrape lyrics from the song page
             lyrics = self._scrape_lyrics(song_url)
@@ -95,6 +76,7 @@ class LyricsService:
         except Exception as e:
             print(f"Error fetching lyrics: {e}")
             return None
+
     
     def _scrape_lyrics(self, url: str) -> Optional[str]:
         """

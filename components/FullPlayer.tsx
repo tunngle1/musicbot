@@ -115,10 +115,10 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
         <div className="w-full px-8 pb-12 flex flex-col space-y-8">
 
           <div className="flex justify-between items-start gap-4">
-            <div className="space-y-1 flex-1 min-w-0">
+            <div className="flex-1 min-w-0">
               <MarqueeText
                 text={title || ''}
-                className="text-2xl font-bold text-white leading-tight text-glow"
+                className="text-2xl font-bold text-white leading-tight text-glow mb-1"
               />
               <div
                 onClick={() => {
@@ -146,7 +146,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
               >
                 <MarqueeText
                   text={subtitle || ''}
-                  className="text-lg text-white/60 font-medium leading-snug"
+                  className="text-lg text-white/60 font-medium"
                 />
               </div>
             </div>
