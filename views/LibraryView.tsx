@@ -81,10 +81,7 @@ const LibraryView: React.FC = () => {
         setYoutubeUrl('');
         setFoundYoutubeTrack(null);
 
-        // Auto-play the new track
-        playTrack(newTrack);
-
-        alert('Трек сохранен и запущен!');
+        alert('Трек сохранен в медиатеку!');
       } else {
         setIsDownloadingChat(true);
         // Download to Chat

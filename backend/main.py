@@ -814,53 +814,88 @@ async def get_youtube_file(url: str, background_tasks: BackgroundTasks):
     import tempfile
     
     try:
-        # Create temp file
-        fd, temp_path = tempfile.mkstemp(suffix='.mp3')
-        os.close(fd)
+        print(f"📥 Starting download for: {url}")
+        
+        # Create temp directory
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, 'audio')
         
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': temp_path,
-            'quiet': True,
-            'no_warnings': True,
-            # We don't force mp3 conversion here to avoid ffmpeg requirement if possible,
-            # but usually bestaudio is webm/m4a. 
-            # If user has ffmpeg, we can add postprocessors.
-            # For now, let's just download best audio.
+            'quiet': False,
+            'no_warnings': False,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
         }
-        
-        # If ffmpeg is available, convert to mp3 for better compatibility
-        # ydl_opts['postprocessors'] = [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3',}]
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            info = ydl.extract_info(url, download=True)
+            print(f"✅ Download complete. Info: {info.get('ext', 'unknown')}")
             
-        # Check if file exists (sometimes extension changes)
-        if not os.path.exists(temp_path):
-            # Try to find the file with other extensions
-            base_path = temp_path.rsplit('.', 1)[0]
-            for ext in ['.mp3', '.m4a', '.webm', '.opus']:
-                if os.path.exists(base_path + ext):
-                    temp_path = base_path + ext
+        # Find the downloaded file (extension may vary)
+        downloaded_file = None
+        
+        # First check if file exists without extension (yt-dlp sometimes does this)
+        if os.path.exists(temp_path):
+            downloaded_file = temp_path
+            print(f"📁 Found file without extension: {downloaded_file}")
+        else:
+            # Try with common extensions
+            for ext in ['.webm', '.m4a', '.opus', '.mp3', '.mp4']:
+                test_path = temp_path + ext
+                if os.path.exists(test_path):
+                    downloaded_file = test_path
+                    print(f"📁 Found file with extension: {downloaded_file}")
                     break
+        
+        if not downloaded_file:
+            # List what's actually in the temp directory for debugging
+            files_in_dir = os.listdir(temp_dir) if os.path.exists(temp_dir) else []
+            print(f"🔍 Files in temp dir: {files_in_dir}")
+            raise Exception(f"Downloaded file not found. Checked: {temp_path}, Dir contents: {files_in_dir}")
+        
+        # Determine media type based on actual file or info
+        if os.path.splitext(downloaded_file)[1]:
+            ext = os.path.splitext(downloaded_file)[1].lower()
+        else:
+            # No extension, use info from yt-dlp
+            ext = '.' + info.get('ext', 'webm')
+            
+        media_types = {
+            '.webm': 'audio/webm',
+            '.m4a': 'audio/mp4',
+            '.opus': 'audio/opus',
+            '.mp3': 'audio/mpeg',
+            '.mp4': 'audio/mp4'
+        }
+        media_type = media_types.get(ext, 'audio/webm')
         
         def cleanup():
             try:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+                import shutil
+                if os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir)
+                    print(f"🗑️ Cleaned up: {temp_dir}")
             except Exception as e:
-                print(f"Error cleaning up temp file: {e}")
+                print(f"Error cleaning up temp dir: {e}")
 
         background_tasks.add_task(cleanup)
         
+        print(f"📤 Sending file: {downloaded_file} as {media_type}")
         return FileResponse(
-            temp_path, 
-            media_type='audio/mpeg', 
-            filename='track.mp3'
+            downloaded_file, 
+            media_type=media_type, 
+            filename=f'track{ext}'
         )
 
     except Exception as e:
-        print(f"Error downloading file: {e}")
+        print(f"❌ Error downloading file: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
 # --- Lyrics Endpoints ---
