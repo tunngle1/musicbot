@@ -7,6 +7,7 @@ import FullPlayer from './components/FullPlayer';
 import HomeView from './views/HomeView';
 import PlaylistsView from './views/PlaylistsView';
 import FavoritesView from './views/FavoritesView';
+import RadioView from './views/RadioView';
 import LibraryView from './views/LibraryView';
 import AdminView from './views/AdminView';
 import { initTelegramWebApp } from './utils/telegram';
@@ -127,6 +128,8 @@ const AppContent: React.FC = () => {
         return <PlaylistsView />;
       case ViewState.FAVORITES:
         return <FavoritesView />;
+      case ViewState.RADIO:
+        return <RadioView />;
       case ViewState.LIBRARY:
         return <LibraryView />;
       case ViewState.ADMIN:

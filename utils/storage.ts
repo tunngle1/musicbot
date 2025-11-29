@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Track } from '../types';
+import { Track, RadioStation } from '../types';
 
 import { Playlist } from '../types';
 
@@ -28,10 +28,18 @@ interface MusicDB extends DBSchema {
         };
         indexes: { 'by-date': number };
     };
+    favoriteRadios: {
+        key: string;
+        value: {
+            radioId: string;
+            savedAt: number;
+        };
+        indexes: { 'by-date': number };
+    };
 }
 
 const DB_NAME = 'tg-music-player-db';
-const DB_VERSION = 5; // Increment version
+const DB_VERSION = 6; // Increment version for favoriteRadios
 
 class StorageService {
     private dbPromise: Promise<IDBPDatabase<MusicDB>>;
@@ -51,6 +59,10 @@ class StorageService {
                 if (oldVersion < 5) {
                     const favoriteStore = db.createObjectStore('favorites', { keyPath: 'id' });
                     favoriteStore.createIndex('by-date', 'savedAt');
+                }
+                if (oldVersion < 6) {
+                    const favoriteRadioStore = db.createObjectStore('favoriteRadios', { keyPath: 'radioId' });
+                    favoriteRadioStore.createIndex('by-date', 'savedAt');
                 }
             },
             blocked(currentVersion, blockedVersion, event) {
@@ -159,6 +171,32 @@ class StorageService {
         const db = await this.dbPromise;
         const track = await db.get('favorites', id);
         return !!track;
+    }
+
+    // Favorite Radio Methods
+    async saveFavoriteRadio(radioId: string): Promise<void> {
+        const db = await this.dbPromise;
+        await db.put('favoriteRadios', {
+            radioId,
+            savedAt: Date.now()
+        });
+    }
+
+    async removeFavoriteRadio(radioId: string): Promise<void> {
+        const db = await this.dbPromise;
+        await db.delete('favoriteRadios', radioId);
+    }
+
+    async getFavoriteRadios(): Promise<string[]> {
+        const db = await this.dbPromise;
+        const favorites = await db.getAllFromIndex('favoriteRadios', 'by-date');
+        return favorites.map(f => f.radioId);
+    }
+
+    async isFavoriteRadio(radioId: string): Promise<boolean> {
+        const db = await this.dbPromise;
+        const radio = await db.get('favoriteRadios', radioId);
+        return !!radio;
     }
 }
 

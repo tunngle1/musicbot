@@ -62,6 +62,9 @@ interface PlayerContextType {
   // Favorites
   favorites: Track[];
   toggleFavorite: (track: Track) => Promise<void>;
+  // Favorite Radios
+  favoriteRadios: Set<string>;
+  toggleFavoriteRadio: (radioId: string) => Promise<void>;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -87,6 +90,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Favorites State
   const [favorites, setFavorites] = useState<Track[]>([]);
+  const [favoriteRadios, setFavoriteRadios] = useState<Set<string>>(new Set());
 
   const toggleFavorite = async (track: Track) => {
     try {
@@ -101,6 +105,26 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       hapticFeedback.medium();
     } catch (error) {
       console.error('Error toggling favorite:', error);
+    }
+  };
+
+  const toggleFavoriteRadio = async (radioId: string) => {
+    try {
+      const isFav = favoriteRadios.has(radioId);
+      if (isFav) {
+        await storage.removeFavoriteRadio(radioId);
+        setFavoriteRadios(prev => {
+          const next = new Set(prev);
+          next.delete(radioId);
+          return next;
+        });
+      } else {
+        await storage.saveFavoriteRadio(radioId);
+        setFavoriteRadios(prev => new Set(prev).add(radioId));
+      }
+      hapticFeedback.medium();
+    } catch (error) {
+      console.error('Error toggling favorite radio:', error);
     }
   };
 
@@ -216,7 +240,10 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
         const savedPlaylists = await storage.getAllPlaylists();
         const loadedFavorites = await storage.getFavorites();
+        const loadedFavoriteRadios = await storage.getFavoriteRadios();
+
         setFavorites(loadedFavorites);
+        setFavoriteRadios(new Set(loadedFavoriteRadios));
 
         if (savedPlaylists.length > 0) {
           setPlaylists(prev => {
@@ -693,7 +720,9 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       resetSearch,
       user,
       favorites,
-      toggleFavorite
+      toggleFavorite,
+      favoriteRadios,
+      toggleFavoriteRadio
     }}>
       {children}
     </PlayerContext.Provider>

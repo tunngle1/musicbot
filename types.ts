@@ -44,6 +44,7 @@ export enum ViewState {
   HOME = 'home',
   PLAYLISTS = 'playlists',
   FAVORITES = 'favorites',
+  RADIO = 'radio',
   LIBRARY = 'library',
   PLAYLIST_DETAILS = 'PLAYLIST_DETAILS',
   ADMIN = 'admin'

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Library, ListMusic, Heart } from 'lucide-react';
+import { Home, Library, ListMusic, Heart, Radio } from 'lucide-react';
 import { ViewState } from '../types';
 
 interface BottomNavProps {
@@ -23,6 +23,10 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, onNavigate }) => {
       <button className={getItemClass(ViewState.FAVORITES)} onClick={() => onNavigate(ViewState.FAVORITES)}>
         <Heart size={24} />
         <span className="text-[10px] font-medium">Избранное</span>
+      </button>
+      <button className={getItemClass(ViewState.RADIO)} onClick={() => onNavigate(ViewState.RADIO)}>
+        <Radio size={24} />
+        <span className="text-[10px] font-medium">Радио</span>
       </button>
       <button className={getItemClass(ViewState.LIBRARY)} onClick={() => onNavigate(ViewState.LIBRARY)}>
         <Library size={24} />

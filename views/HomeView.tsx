@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Play, MoreVertical, Search, Loader, Radio } from 'lucide-react';
+import { Play, MoreVertical, Search, Loader, Radio, Heart } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { Track, RadioStation } from '../types';
 import { searchTracks, getGenreTracks, getRadioStations, downloadToChat } from '../utils/api';
 import { hapticFeedback, getTelegramUser } from '../utils/telegram';
+import { deduplicateTracks } from '../utils/deduplication';
 
 const HomeView: React.FC = () => {
   const {
@@ -21,7 +22,9 @@ const HomeView: React.FC = () => {
     searchState,
     setSearchState,
     user,
-    favorites
+    favorites,
+    favoriteRadios,
+    toggleFavoriteRadio
   } = usePlayer();
 
   const [showActionModal, setShowActionModal] = useState(false);
@@ -39,8 +42,9 @@ const HomeView: React.FC = () => {
   const [downloadStatus, setDownloadStatus] = useState<'downloading' | 'uploading' | 'done'>('downloading');
 
 
-  // Отображаемые треки: результаты поиска или все треки
-  const displayTracks = searchState.results.length > 0 ? searchState.results : (searchState.query.trim() ? [] : allTracks);
+  // Отображаемые треки: результаты поиска или все треки (с дедупликацией)
+  const rawDisplayTracks = searchState.results.length > 0 ? searchState.results : (searchState.query.trim() ? [] : allTracks);
+  const displayTracks = deduplicateTracks(rawDisplayTracks);
 
   // Search with debounce
   useEffect(() => {
