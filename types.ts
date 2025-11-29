@@ -43,6 +43,7 @@ export interface Lyrics {
 export enum ViewState {
   HOME = 'home',
   PLAYLISTS = 'playlists',
+  FAVORITES = 'favorites',
   LIBRARY = 'library',
   PLAYLIST_DETAILS = 'PLAYLIST_DETAILS',
   ADMIN = 'admin'

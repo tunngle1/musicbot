@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Download, Share2, Shuffle, FileText, Heart } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { formatTime } from '../utils/format';
-import { getLyrics } from '../utils/api';
+import { getLyrics, downloadToChat } from '../utils/api';
 import LyricsModal from './LyricsModal';
 import MarqueeText from './MarqueeText';
 import ArtistSelectorModal from './ArtistSelectorModal';
+import DownloadModal from './DownloadModal';
 import { hapticFeedback } from '../utils/telegram';
 import { getDominantColor } from '../utils/colors';
 
@@ -33,7 +34,8 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
     downloadTrack,
     setSearchState,
     favorites,
-    toggleFavorite
+    toggleFavorite,
+    user
   } = usePlayer();
 
   // Lyrics state
@@ -44,6 +46,9 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
 
   // Artist selector state
   const [showArtistSelector, setShowArtistSelector] = useState(false);
+
+  // Download modal state
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   // Gesture state
   const touchStartX = useRef<number | null>(null);
@@ -68,11 +73,13 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
   }, [coverUrl]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation(); // Prevent propagation to elements behind
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation(); // Prevent propagation to elements behind
     if (!touchStartX.current || !touchStartY.current) return;
 
     const touchEndX = e.changedTouches[0].clientX;
@@ -247,7 +254,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
                       setSearchState(prev => ({
                         ...prev,
                         query: currentTrack.artist,
-                        isArtistSearch: true,
+                        searchMode: 'artist',
                         results: [],
                         genreId: null
                       }));
@@ -265,14 +272,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
             {!isRadioMode && currentTrack && (
               <div className="flex gap-3 flex-shrink-0">
                 <button
-                  onClick={handleShowLyrics}
-                  className="p-3 rounded-full glass-button text-white/80 hover:text-white hover:bg-white/10 transition-all active:scale-95"
-                  title="Текст песни"
-                >
-                  <FileText size={20} />
-                </button>
-                <button
-                  onClick={() => downloadTrack(currentTrack)}
+                  onClick={() => setShowDownloadModal(true)}
                   className="p-3 rounded-full glass-button text-white/80 hover:text-white hover:bg-white/10 transition-all active:scale-95"
                   title="Скачать"
                 >
@@ -386,6 +386,27 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
           }));
         }}
       />
+
+      {/* Download Modal */}
+      {currentTrack && (
+        <DownloadModal
+          isOpen={showDownloadModal}
+          onClose={() => setShowDownloadModal(false)}
+          trackTitle={currentTrack.title}
+          onDownloadToApp={() => downloadTrack(currentTrack)}
+          onDownloadToChat={async () => {
+            if (user) {
+              try {
+                await downloadToChat(user.id, currentTrack);
+                hapticFeedback.success();
+              } catch (error) {
+                console.error('Download to chat error:', error);
+                hapticFeedback.error();
+              }
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -24,15 +24,15 @@ const LyricsModal: React.FC<LyricsModalProps> = ({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in"
             onClick={onClose}
         >
             <div
-                className="bg-gradient-to-b from-gray-900 to-black w-full max-w-2xl max-h-[80vh] rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-scale-in"
+                className="glass-heavy w-full h-full max-w-4xl max-h-[95vh] m-4 rounded-3xl border border-white/20 shadow-2xl overflow-hidden animate-scale-in flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div className="sticky top-0 bg-gradient-to-b from-gray-900 to-gray-900/95 backdrop-blur-md p-6 border-b border-white/10 z-10">
+                {/* Header - Fixed */}
+                <div className="flex-shrink-0 p-6 border-b border-white/10">
                     <div className="flex items-start justify-between">
                         <div className="flex items-start gap-3 flex-1">
                             <div className="p-2 bg-blue-500/20 rounded-lg">
@@ -52,8 +52,8 @@ const LyricsModal: React.FC<LyricsModalProps> = ({
                     </div>
                 </div>
 
-                {/* Content */}
-                <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)] custom-scrollbar">
+                {/* Content - Scrollable */}
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                     {isLoading && (
                         <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                             <Loader2 size={48} className="animate-spin mb-4 text-blue-500" />
@@ -73,7 +73,7 @@ const LyricsModal: React.FC<LyricsModalProps> = ({
 
                     {lyrics && !isLoading && !error && (
                         <div className="space-y-4">
-                            <pre className="text-gray-200 whitespace-pre-wrap font-sans leading-relaxed text-base">
+                            <pre className="text-gray-200 whitespace-pre-wrap font-sans leading-relaxed text-lg">
                                 {lyrics}
                             </pre>
 
@@ -85,7 +85,7 @@ const LyricsModal: React.FC<LyricsModalProps> = ({
                                         window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                                     }
                                 }}
-                                className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-medium transition-colors"
+                                className="w-full py-3 glass-button hover:bg-white/10 border border-white/10 rounded-xl text-white font-medium transition-colors"
                             >
                                 Скопировать текст
                             </button>
