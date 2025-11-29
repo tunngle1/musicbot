@@ -44,14 +44,19 @@ const LibraryView: React.FC = () => {
   const handleYoutubeDownload = async (target: 'app' | 'chat') => {
     if (!foundYoutubeTrack) return;
     setIsYoutubeLoading(true);
-    
+
     try {
       if (target === 'app') {
-        // Download to App
-        const audioRes = await fetch(foundYoutubeTrack.url);
+        // Download to App via Proxy to avoid CORS
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const proxyUrl = `${apiUrl}/api/stream?url=${encodeURIComponent(foundYoutubeTrack.url)}`;
+
+        const audioRes = await fetch(proxyUrl);
+        if (!audioRes.ok) throw new Error('Failed to download audio via proxy');
+
         const audioBlob = await audioRes.blob();
         const objectUrl = URL.createObjectURL(audioBlob);
-        
+
         // Try to get cover blob
         let coverBlob = null;
         try {
@@ -68,7 +73,7 @@ const LibraryView: React.FC = () => {
 
         addTrack(newTrack);
         await storage.saveTrack(newTrack, audioBlob, coverBlob);
-        
+
         setLibraryTracks(prev => [newTrack, ...prev]);
         setYoutubeUrl('');
         setFoundYoutubeTrack(null);
