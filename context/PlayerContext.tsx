@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect, ReactNode } from 'react';
-import { Track, Playlist, RepeatMode, RadioStation, User } from '../types';
+import { Track, Playlist, RepeatMode, RadioStation, User, SearchMode } from '../types';
 import { MOCK_TRACKS, INITIAL_PLAYLISTS, API_BASE_URL } from '../constants';
 
 interface PlayerContextType {
@@ -42,7 +42,7 @@ interface PlayerContextType {
     error: string | null;
     page: number;
     hasMore: boolean;
-    isArtistSearch: boolean;
+    searchMode: SearchMode;
     genreId: number | null; // New field
   };
   setSearchState: React.Dispatch<React.SetStateAction<{
@@ -52,7 +52,7 @@ interface PlayerContextType {
     error: string | null;
     page: number;
     hasMore: boolean;
-    isArtistSearch: boolean;
+    searchMode: SearchMode;
     genreId: number | null;
   }>>;
   resetSearch: () => void;
@@ -89,7 +89,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     error: null as string | null,
     page: 1,
     hasMore: true,
-    isArtistSearch: false,
+    searchMode: 'all' as SearchMode,
     genreId: null as number | null
   });
 
@@ -101,7 +101,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       error: null,
       page: 1,
       hasMore: true,
-      isArtistSearch: false,
+      searchMode: 'all',
       genreId: null
     });
   };

@@ -55,7 +55,7 @@ const HomeView: React.FC = () => {
       setSearchState(prev => ({ ...prev, isSearching: true, error: null, page: 1, genreId: null }));
 
       try {
-        const results = await searchTracks(searchState.query, 20, 1, searchState.isArtistSearch);
+        const results = await searchTracks(searchState.query, 20, 1, searchState.searchMode);
         setSearchState(prev => ({
           ...prev,
           results,
@@ -74,7 +74,7 @@ const HomeView: React.FC = () => {
     }, 1500); // 1.5 seconds debounce
 
     return () => clearTimeout(timeoutId);
-  }, [searchState.query, searchState.isArtistSearch, setSearchState]);
+  }, [searchState.query, searchState.searchMode, setSearchState]);
 
   const loadMore = async () => {
     if (isLoadingMore || !searchState.hasMore) return;
@@ -88,7 +88,7 @@ const HomeView: React.FC = () => {
       if (searchState.genreId) {
         newResults = await getGenreTracks(searchState.genreId, 20, nextPage);
       } else {
-        newResults = await searchTracks(searchState.query, 20, nextPage, searchState.isArtistSearch);
+        newResults = await searchTracks(searchState.query, 20, nextPage, searchState.searchMode);
       }
 
       if (newResults.length === 0) {
@@ -125,7 +125,7 @@ const HomeView: React.FC = () => {
       setSearchState(prev => ({
         ...prev,
         query,
-        isArtistSearch: false,
+        searchMode: prev.searchMode, // Keep current mode
         genreId: null,
         results: [], // Clear results immediately
         error: null
@@ -135,7 +135,7 @@ const HomeView: React.FC = () => {
       setSearchState(prev => ({
         ...prev,
         query,
-        isArtistSearch: false,
+        searchMode: 'all', // Reset to all
         genreId: null,
         results: [],
         hasMore: true,
@@ -171,33 +171,18 @@ const HomeView: React.FC = () => {
 
   return (
     <div className="px-4 py-8 space-y-8 animate-fade-in-up pb-24">
-      {/* Premium Badge */}
-      {user?.is_premium && (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500 p-[2px]">
-          <div className="bg-gray-900 rounded-2xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-white">
-                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-white font-bold text-sm">Premium подписка</h3>
-                <p className="text-yellow-200 text-xs">Скачивайте треки без ограничений</p>
-              </div>
-            </div>
-            <div className="px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full">
-              <span className="text-white text-xs font-bold">ACTIVE</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
-          Музыка
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+            Музыка
+          </h1>
+          {user?.is_premium && (
+            <span className="px-2 py-0.5 rounded-md bg-white/10 text-white/50 text-[10px] font-medium uppercase tracking-wider border border-white/5 backdrop-blur-sm">
+              Premium
+            </span>
+          )}
+        </div>
         <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs">
           TG
         </div>
@@ -220,6 +205,48 @@ const HomeView: React.FC = () => {
           className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
         />
       </div>
+
+      {/* Search Filters */}
+      {searchState.query.trim() && (
+        <div className="flex gap-2 animate-fade-in overflow-x-auto pb-1 no-scrollbar">
+          <button
+            onClick={() => {
+              hapticFeedback.light();
+              setSearchState(prev => ({ ...prev, searchMode: 'all', results: [], page: 1 }));
+            }}
+            className={`flex-1 min-w-[80px] py-2 px-3 rounded-xl text-sm font-semibold transition-all whitespace-nowrap glass-panel ${searchState.searchMode === 'all'
+              ? 'bg-white/20 text-white border-white/20'
+              : 'text-gray-300 hover:bg-white/10'
+              }`}
+          >
+            Все
+          </button>
+          <button
+            onClick={() => {
+              hapticFeedback.light();
+              setSearchState(prev => ({ ...prev, searchMode: 'artist', results: [], page: 1 }));
+            }}
+            className={`flex-1 min-w-[120px] py-2 px-3 rounded-xl text-sm font-semibold transition-all whitespace-nowrap glass-panel ${searchState.searchMode === 'artist'
+              ? 'bg-white/20 text-white border-white/20'
+              : 'text-gray-300 hover:bg-white/10'
+              }`}
+          >
+            По исполнителю
+          </button>
+          <button
+            onClick={() => {
+              hapticFeedback.light();
+              setSearchState(prev => ({ ...prev, searchMode: 'track', results: [], page: 1 }));
+            }}
+            className={`flex-1 min-w-[100px] py-2 px-3 rounded-xl text-sm font-semibold transition-all whitespace-nowrap glass-panel ${searchState.searchMode === 'track'
+              ? 'bg-white/20 text-white border-white/20'
+              : 'text-gray-300 hover:bg-white/10'
+              }`}
+          >
+            По названию
+          </button>
+        </div>
+      )}
 
       {/* Error Message */}
       {searchState.error && (

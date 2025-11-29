@@ -341,7 +341,8 @@ async def search_tracks(
     q: str = Query(..., description="Поисковый запрос", min_length=1),
     limit: int = Query(20, description="Максимальное количество результатов", ge=1, le=50),
     page: int = Query(1, description="Номер страницы", ge=1),
-    by_artist: bool = Query(False, description="Искать только по исполнителю")
+    by_artist: bool = Query(False, description="Искать только по исполнителю"),
+    by_track: bool = Query(False, description="Искать только по названию трека")
 ):
     """
     Поиск треков по запросу (с кэшированием)
@@ -352,7 +353,8 @@ async def search_tracks(
             "q": q, 
             "limit": limit, 
             "page": page, 
-            "by_artist": by_artist
+            "by_artist": by_artist,
+            "by_track": by_track
         })
         
         cached_data = get_from_cache(cache_key)
@@ -368,12 +370,18 @@ async def search_tracks(
         # 2. Если нет в кэше, делаем запрос
         tracks = await parser.search(q, limit=limit, page=page)
         
-        # Фильтрация по артисту если запрошено
+        # Фильтрация по артисту или треку если запрошено
+        query_lower = q.lower()
+        
         if by_artist:
-            query_lower = q.lower()
             tracks = [
                 track for track in tracks 
                 if query_lower in track['artist'].lower()
+            ]
+        elif by_track:
+            tracks = [
+                track for track in tracks 
+                if query_lower in track['title'].lower()
             ]
         
         # Конвертируем в Pydantic модели и оборачиваем URL в прокси

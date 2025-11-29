@@ -49,3 +49,4 @@ export enum ViewState {
 }
 
 export type RepeatMode = 'none' | 'all' | 'one';
+export type SearchMode = 'all' | 'artist' | 'track';

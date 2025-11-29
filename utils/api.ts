@@ -3,7 +3,7 @@
  * Клиент для взаимодействия с FastAPI бэкендом
  */
 
-import { Track } from '../types';
+import { Track, SearchMode } from '../types';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -28,7 +28,7 @@ export const searchTracks = async (
     query: string,
     limit: number = 20,
     page: number = 1,
-    byArtist: boolean = false
+    searchMode: SearchMode = 'all'
 ): Promise<Track[]> => {
     try {
         const url = new URL(`${API_BASE_URL}/api/search`);
@@ -36,8 +36,10 @@ export const searchTracks = async (
         url.searchParams.append('limit', limit.toString());
         url.searchParams.append('page', page.toString());
 
-        if (byArtist) {
+        if (searchMode === 'artist') {
             url.searchParams.append('by_artist', 'true');
+        } else if (searchMode === 'track') {
+            url.searchParams.append('by_track', 'true');
         }
 
         const response = await fetch(url.toString(), {
