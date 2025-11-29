@@ -825,6 +825,7 @@ async def get_youtube_file(url: str, background_tasks: BackgroundTasks):
             'outtmpl': temp_path,
             'quiet': False,
             'no_warnings': False,
+            'ffmpeg_location': r'C:\ffmpeg-2025-11-27-git-61b034a47c-essentials_build\bin',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
