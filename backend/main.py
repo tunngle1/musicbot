@@ -390,38 +390,21 @@ async def grant_rights(
         
     db.commit()
     
-    # If premium was revoked, delete all downloaded messages
-    if was_premium and request.is_premium == False and BOT_TOKEN:
-        try:
-            messages = db.query(DownloadedMessage).filter(DownloadedMessage.user_id == request.user_id).all()
-            
-            if messages:
-                telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/deleteMessage"
-                deleted_count = 0
-                
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    for msg in messages:
-                        try:
-                            response = await client.post(telegram_url, json={
-                                'chat_id': msg.chat_id,
-                                'message_id': msg.message_id
-                            })
-                            if response.status_code == 200:
-                                deleted_count += 1
-                        except Exception as e:
-                            print(f"Failed to delete message {msg.message_id}: {e}")
-                
-                # Delete from database
-                db.query(DownloadedMessage).filter(DownloadedMessage.user_id == request.user_id).delete()
-                db.commit()
-                
-                print(f"Auto-deleted {deleted_count} messages for user {request.user_id}")
-        except Exception as e:
-            print(f"Error auto-deleting messages: {e}")
+    # Если премиум был отозван, запланировать удаление треков через 24 часа
+    if was_premium and (request.is_premium == False or request.is_premium_pro == False):
+        # Установить таймер на удаление через 24 часа
+        now = datetime.utcnow()
+        target_user.subscription_expired_at = now
+        target_user.tracks_deletion_scheduled_at = now + timedelta(hours=24)
+        db.commit()
+        
+        # TODO: Отправить уведомление пользователю о том, что треки будут удалены через 24 часа
+        # Для этого потребуется реализовать фоновую задачу с APScheduler
     
     return {"status": "ok", "message": f"Rights updated for user {request.user_id}"}
 
 # --- Cache Admin Endpoints ---
+
 
 @app.get("/api/admin/cache/stats", response_model=CacheStats)
 async def get_admin_cache_stats(user_id: int = Query(...), db: Session = Depends(get_db)):

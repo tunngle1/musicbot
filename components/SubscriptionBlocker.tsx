@@ -47,6 +47,7 @@ const SubscriptionBlocker: React.FC<SubscriptionBlockerProps> = ({ user, onRefre
     };
 
     const blockInfo = getBlockMessage();
+    const isBlocked = user?.subscription_status?.reason === 'blocked';
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black">
@@ -79,17 +80,19 @@ const SubscriptionBlocker: React.FC<SubscriptionBlockerProps> = ({ user, onRefre
                             </div>
                         </button>
 
-                        <button
-                            onClick={onRefresh}
-                            className="w-full py-4 px-6 rounded-xl text-gray-400 font-semibold hover:text-white hover:bg-white/5 transition-all"
-                        >
-                            <div className="flex items-center justify-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
-                                </svg>
-                                Обновить статус
-                            </div>
-                        </button>
+                        {!isBlocked && (
+                            <button
+                                onClick={onRefresh}
+                                className="w-full py-4 px-6 rounded-xl text-gray-400 font-semibold hover:text-white hover:bg-white/5 transition-all"
+                            >
+                                <div className="flex items-center justify-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+                                    </svg>
+                                    Обновить статус
+                                </div>
+                            </button>
+                        )}
                     </div>
 
                     {user && (

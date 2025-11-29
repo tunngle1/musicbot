@@ -5,7 +5,6 @@ import { Track } from '../types';
 import { searchTracks, getGenreTracks, downloadToChat } from '../utils/api';
 import { hapticFeedback, getTelegramUser } from '../utils/telegram';
 import { deduplicateTracks } from '../utils/deduplication';
-import SubscriptionBadge from '../components/SubscriptionBadge';
 
 const HomeView: React.FC = () => {
   const {
@@ -185,7 +184,12 @@ const HomeView: React.FC = () => {
           <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
             Музыка
           </h1>
-          {user?.is_premium && (
+          {user?.is_premium_pro && (
+            <span className="px-2 py-0.5 rounded-md bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 text-[10px] font-medium uppercase tracking-wider border border-purple-500/30 backdrop-blur-sm">
+              Premium Pro
+            </span>
+          )}
+          {user?.is_premium && !user?.is_premium_pro && (
             <span className="px-2 py-0.5 rounded-md bg-white/10 text-white/50 text-[10px] font-medium uppercase tracking-wider border border-white/5 backdrop-blur-sm">
               Premium
             </span>
@@ -195,9 +199,6 @@ const HomeView: React.FC = () => {
           TG
         </div>
       </div>
-
-      {/* Subscription Badge */}
-      <SubscriptionBadge user={user} />
 
       {/* Search Bar */}
       <div className="relative">

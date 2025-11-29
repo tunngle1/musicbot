@@ -67,12 +67,14 @@ def init_db():
     admin_id = 414153884
     admin = db.query(User).filter(User.id == admin_id).first()
     if not admin:
-        admin = User(id=admin_id, username="admin", is_admin=True, is_premium=True)
+        admin = User(id=admin_id, username="admin", is_admin=True, is_premium=True, is_premium_pro=True)
         db.add(admin)
         db.commit()
     else:
-        if not admin.is_admin:
+        if not admin.is_admin or not admin.is_premium_pro:
             admin.is_admin = True
+            admin.is_premium = True
+            admin.is_premium_pro = True
             db.commit()
     db.close()
 
