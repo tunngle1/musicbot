@@ -8,4 +8,4 @@ selenium
 webdriver-manager
 sqlalchemy==2.0.23
 lyricsgenius==3.0.1
-yt-dlp
+

@@ -755,49 +755,82 @@ class YouTubeRequest(BaseModel):
 @app.post("/api/youtube/info", response_model=Track)
 async def get_youtube_info(request: YouTubeRequest):
     """
-    Get track info from YouTube URL
+    Get track info from YouTube URL using Cobalt API for audio and page scraping for metadata
     """
     try:
-        import yt_dlp
+        # 1. Scrape Metadata (Title, Artist, Thumbnail)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            page_response = await client.get(request.url)
+            page_content = page_response.text
+            
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(page_content, 'html.parser')
         
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'quiet': True,
-            'no_warnings': True,
-            'extract_flat': False,
+        title = soup.find("meta", property="og:title")
+        title = title["content"] if title else "Unknown Title"
+        
+        image = soup.find("meta", property="og:image")
+        thumbnail = image["content"] if image else ""
+        
+        # Duration is harder to scrape reliably without parsing JSON in scripts, 
+        # but we can try or default to 0.
+        duration = 0
+        
+        # Clean up title
+        clean_title = title.replace('(Official Video)', '').replace('[Official Video]', '').strip()
+        
+        # Try to parse Artist - Title
+        if '-' in clean_title:
+            parts = clean_title.split('-', 1)
+            artist = parts[0].strip()
+            track_title = parts[1].strip()
+        else:
+            # Try to find channel name
+            author_tag = soup.find("link", itemprop="name")
+            artist = author_tag["content"] if author_tag else "Unknown Artist"
+            track_title = clean_title
+
+        # 2. Get Audio URL from Cobalt API
+        cobalt_headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(request.url, download=False)
+        cobalt_body = {
+            "url": request.url,
+            "aFormat": "mp3",
+            "isAudioOnly": True
+        }
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Try primary cobalt instance
+            cobalt_response = await client.post("https://api.cobalt.tools/api/json", json=cobalt_body, headers=cobalt_headers)
             
-            # Extract relevant info
-            video_id = info.get('id')
-            title = info.get('title', 'Unknown Title')
-            uploader = info.get('uploader', 'Unknown Artist')
-            duration = info.get('duration', 0)
-            thumbnail = info.get('thumbnail', '')
-            url = info.get('url') # Direct audio URL
-            
-            # Clean up title (remove "Official Video", etc.)
-            clean_title = title.replace('(Official Video)', '').replace('[Official Video]', '').strip()
-            
-            # Try to parse Artist - Title
-            if '-' in clean_title:
-                parts = clean_title.split('-', 1)
-                artist = parts[0].strip()
-                track_title = parts[1].strip()
-            else:
-                artist = uploader
-                track_title = clean_title
+            if cobalt_response.status_code != 200:
+                # Fallback to another instance if needed, or just raise error
+                print(f"Cobalt API error: {cobalt_response.text}")
+                raise Exception("Cobalt API unavailable")
                 
-            return Track(
-                id=f"yt_{video_id}",
-                title=track_title,
-                artist=artist,
-                duration=duration,
-                url=url, # This is the direct stream URL
-                image=thumbnail
-            )
+            data = cobalt_response.json()
+            audio_url = data.get("url")
+            
+            if not audio_url:
+                raise Exception("No audio URL returned from Cobalt")
+
+        # Video ID for ID generation
+        import re
+        video_id_match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", request.url)
+        video_id = video_id_match.group(1) if video_id_match else "yt_unknown"
+
+        return Track(
+            id=f"yt_{video_id}",
+            title=track_title,
+            artist=artist,
+            duration=duration,
+            url=audio_url,
+            image=thumbnail
+        )
             
     except Exception as e:
         print(f"Error extracting YouTube info: {e}")
