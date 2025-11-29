@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useRef, useEffect, ReactNod
 import { Track, Playlist, RepeatMode, RadioStation, User, SearchMode } from '../types';
 import { MOCK_TRACKS, INITIAL_PLAYLISTS, API_BASE_URL } from '../constants';
 import { hapticFeedback } from '../utils/telegram';
+import { searchTracks, getGenreTracks } from '../utils/api';
 
 interface PlayerContextType {
   // Данные
@@ -158,12 +159,99 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const currentTrackRef = useRef(currentTrack);
   const repeatModeRef = useRef(repeatMode);
   const isShuffleRef = useRef(isShuffle);
+  const searchStateRef = useRef(searchState);
 
   // Sync refs with state
   useEffect(() => { queueRef.current = queue; }, [queue]);
   useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
   useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
   useEffect(() => { isShuffleRef.current = isShuffle; }, [isShuffle]);
+  useEffect(() => { searchStateRef.current = searchState; }, [searchState]);
+
+  // ... (Auth and Load Data omitted)
+
+  const nextTrack = async () => {
+    const currentTrackVal = currentTrackRef.current;
+    const currentQueue = queueRef.current;
+    const currentSearchState = searchStateRef.current;
+    const isShuffleVal = isShuffleRef.current;
+    const repeatModeVal = repeatModeRef.current;
+
+    if (!currentTrackVal || currentQueue.length === 0) return;
+
+    if (isShuffleVal) {
+      const randomIndex = Math.floor(Math.random() * currentQueue.length);
+      playTrack(currentQueue[randomIndex]);
+      return;
+    }
+
+    const currentIndex = currentQueue.findIndex(t => t.id === currentTrackVal.id);
+
+    if (currentIndex < currentQueue.length - 1) {
+      playTrack(currentQueue[currentIndex + 1]);
+    } else if (currentSearchState.hasMore && !currentSearchState.isSearching && (currentSearchState.query.trim() || currentSearchState.genreId)) {
+      console.log("End of queue reached, loading more tracks...");
+      
+      try {
+        const nextPage = currentSearchState.page + 1;
+        let newTracks: Track[] = [];
+
+        if (currentSearchState.genreId) {
+          newTracks = await getGenreTracks(currentSearchState.genreId, 20, nextPage);
+        } else {
+          newTracks = await searchTracks(currentSearchState.query, currentSearchState.searchMode, 20, nextPage);
+        }
+
+        if (newTracks.length > 0) {
+          setSearchState(prev => ({
+            ...prev,
+            results: [...prev.results, ...newTracks],
+            page: nextPage,
+            hasMore: newTracks.length >= 20
+          }));
+
+          const updatedQueue = [...currentQueue, ...newTracks];
+          setQueue(updatedQueue);
+          playTrack(newTracks[0], updatedQueue);
+        } else {
+          setSearchState(prev => ({ ...prev, hasMore: false }));
+          if (repeatModeVal === 'all') {
+            playTrack(currentQueue[0]);
+          } else {
+            setIsPlaying(false);
+            if (audioRef.current) audioRef.current.currentTime = 0;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load more tracks:", e);
+      }
+    } else if (repeatModeVal === 'all') {
+      playTrack(currentQueue[0]);
+    } else {
+      setIsPlaying(false);
+      if (audioRef.current) audioRef.current.currentTime = 0;
+    }
+  };
+
+  const prevTrack = () => {
+    const currentTrackVal = currentTrackRef.current;
+    const currentQueue = queueRef.current;
+    
+    if (!currentTrackVal || currentQueue.length === 0) return;
+    const audio = audioRef.current;
+
+    if (audio && audio.currentTime > 3) {
+      audio.currentTime = 0;
+      return;
+    }
+
+    const currentIndex = currentQueue.findIndex(t => t.id === currentTrackVal.id);
+    if (currentIndex > 0) {
+      playTrack(currentQueue[currentIndex - 1]);
+    } else {
+      playTrack(currentQueue[currentQueue.length - 1]);
+    }
+  };
 
   // Auth and Load Data
   useEffect(() => {
@@ -464,7 +552,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const togglePlay = () => setIsPlaying(!isPlaying);
 
-  const nextTrack = () => {
+  const nextTrack = async () => {
     if (!currentTrack || queue.length === 0) return;
 
     if (isShuffle) {
@@ -478,6 +566,46 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     if (currentIndex < queue.length - 1) {
       playTrack(queue[currentIndex + 1]);
+    } else if (searchState.hasMore && !searchState.isSearching && (searchState.query.trim() || searchState.genreId)) {
+      // Load more tracks logic
+      console.log("End of queue reached, loading more tracks...");
+
+      try {
+        const nextPage = searchState.page + 1;
+        let newTracks: Track[] = [];
+
+        if (searchState.genreId) {
+          newTracks = await getGenreTracks(searchState.genreId, 20, nextPage);
+        } else {
+          newTracks = await searchTracks(searchState.query, searchState.searchMode, 20, nextPage);
+        }
+
+        if (newTracks.length > 0) {
+          // Update search state
+          setSearchState(prev => ({
+            ...prev,
+            results: [...prev.results, ...newTracks],
+            page: nextPage,
+            hasMore: newTracks.length >= 20
+          }));
+
+          // Update queue and play next
+          const updatedQueue = [...queue, ...newTracks];
+          setQueue(updatedQueue);
+          playTrack(newTracks[0], updatedQueue); // Pass updated queue to ensure consistency
+        } else {
+          setSearchState(prev => ({ ...prev, hasMore: false }));
+          // Fallback to repeat all if no more tracks
+          if (repeatMode === 'all') {
+            playTrack(queue[0]);
+          } else {
+            setIsPlaying(false);
+            if (audioRef.current) audioRef.current.currentTime = 0;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load more tracks:", e);
+      }
     } else if (repeatMode === 'all') {
       playTrack(queue[0]);
     } else {
