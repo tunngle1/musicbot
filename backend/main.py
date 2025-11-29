@@ -755,77 +755,112 @@ class YouTubeRequest(BaseModel):
 @app.post("/api/youtube/info", response_model=Track)
 async def get_youtube_info(request: YouTubeRequest):
     """
-    Get track info using NoEmbed for metadata and Cobalt API for audio
+    Get track info from YouTube URL using yt-dlp
     """
     try:
-        # 1. Get Metadata via NoEmbed (Reliable, no scraping needed)
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            try:
-                oembed_response = await client.get(f"https://noembed.com/embed?url={request.url}")
-                metadata = oembed_response.json()
-            except Exception as e:
-                print(f"Metadata fetch error: {e}")
-                metadata = {}
-
-        title = metadata.get("title", "Unknown Title")
-        artist = metadata.get("author_name", "Unknown Artist")
-        thumbnail = metadata.get("thumbnail_url", "")
+        import yt_dlp
         
-        # Clean up title
-        clean_title = title.replace('(Official Video)', '').replace('[Official Video]', '').strip()
-        
-        # Try to parse Artist - Title if author is generic (like "Vevo") or just to be safe
-        if '-' in clean_title:
-            parts = clean_title.split('-', 1)
-            artist = parts[0].strip()
-            track_title = parts[1].strip()
-        else:
-            track_title = clean_title
-
-        # 2. Get Audio URL from Cobalt API
-        cobalt_headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
         }
         
-        cobalt_body = {
-            "url": request.url,
-            "aFormat": "mp3",
-            "isAudioOnly": True
-        }
-        
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # Try primary cobalt instance
-            cobalt_response = await client.post("https://api.cobalt.tools/api/json", json=cobalt_body, headers=cobalt_headers)
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(request.url, download=False)
             
-            if cobalt_response.status_code != 200:
-                print(f"Cobalt API error: {cobalt_response.text}")
-                raise Exception("Cobalt API unavailable")
+            # Extract relevant info
+            video_id = info.get('id')
+            title = info.get('title', 'Unknown Title')
+            uploader = info.get('uploader', 'Unknown Artist')
+            duration = info.get('duration', 0)
+            thumbnail = info.get('thumbnail', '')
+            url = info.get('url') # Direct audio URL
+            
+            # Clean up title
+            clean_title = title.replace('(Official Video)', '').replace('[Official Video]', '').strip()
+            
+            # Try to parse Artist - Title
+            if '-' in clean_title:
+                parts = clean_title.split('-', 1)
+                artist = parts[0].strip()
+                track_title = parts[1].strip()
+            else:
+                artist = uploader
+                track_title = clean_title
                 
-            data = cobalt_response.json()
-            audio_url = data.get("url")
-            
-            if not audio_url:
-                raise Exception("No audio URL returned from Cobalt")
-
-        # Video ID for ID generation
-        import re
-        video_id_match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", request.url)
-        video_id = video_id_match.group(1) if video_id_match else "yt_unknown"
-
-        return Track(
-            id=f"yt_{video_id}",
-            title=track_title,
-            artist=artist,
-            duration=0, # Noembed doesn't return duration usually
-            url=audio_url,
-            image=thumbnail
-        )
+            return Track(
+                id=f"yt_{video_id}",
+                title=track_title,
+                artist=artist,
+                duration=duration,
+                url=url, 
+                image=thumbnail
+            )
             
     except Exception as e:
         print(f"Error extracting YouTube info: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to process YouTube link: {str(e)}")
+
+@app.get("/api/youtube/download_file")
+async def get_youtube_file(url: str, background_tasks: BackgroundTasks):
+    """
+    Download YouTube audio to server temp file and stream it to client
+    """
+    import yt_dlp
+    import os
+    import tempfile
+    
+    try:
+        # Create temp file
+        fd, temp_path = tempfile.mkstemp(suffix='.mp3')
+        os.close(fd)
+        
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': temp_path,
+            'quiet': True,
+            'no_warnings': True,
+            # We don't force mp3 conversion here to avoid ffmpeg requirement if possible,
+            # but usually bestaudio is webm/m4a. 
+            # If user has ffmpeg, we can add postprocessors.
+            # For now, let's just download best audio.
+        }
+        
+        # If ffmpeg is available, convert to mp3 for better compatibility
+        # ydl_opts['postprocessors'] = [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3',}]
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+            
+        # Check if file exists (sometimes extension changes)
+        if not os.path.exists(temp_path):
+            # Try to find the file with other extensions
+            base_path = temp_path.rsplit('.', 1)[0]
+            for ext in ['.mp3', '.m4a', '.webm', '.opus']:
+                if os.path.exists(base_path + ext):
+                    temp_path = base_path + ext
+                    break
+        
+        def cleanup():
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception as e:
+                print(f"Error cleaning up temp file: {e}")
+
+        background_tasks.add_task(cleanup)
+        
+        return FileResponse(
+            temp_path, 
+            media_type='audio/mpeg', 
+            filename='track.mp3'
+        )
+
+    except Exception as e:
+        print(f"Error downloading file: {e}")
+        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
 # --- Lyrics Endpoints ---
 
