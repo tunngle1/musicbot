@@ -596,11 +596,13 @@ async def stream_audio(request: Request, url: str = Query(..., description="URL 
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': 'https://rus.hitmotop.com/',
         'Accept': '*/*',
         'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Origin': 'https://rus.hitmotop.com',
     }
+    
+    if "hitmotop.com" in url:
+        headers['Referer'] = 'https://rus.hitmotop.com/'
+        headers['Origin'] = 'https://rus.hitmotop.com'
     
     range_header = request.headers.get("range")
     if range_header:
