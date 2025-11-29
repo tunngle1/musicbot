@@ -745,6 +745,62 @@ async def expire_downloads(user_id: int = Query(...), db: Session = Depends(get_
         print(f"Error expiring downloads: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- YouTube Endpoints ---
+
+class YouTubeRequest(BaseModel):
+    url: str
+
+@app.post("/api/youtube/info", response_model=Track)
+async def get_youtube_info(request: YouTubeRequest):
+    """
+    Get track info from YouTube URL
+    """
+    try:
+        import yt_dlp
+        
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(request.url, download=False)
+            
+            # Extract relevant info
+            video_id = info.get('id')
+            title = info.get('title', 'Unknown Title')
+            uploader = info.get('uploader', 'Unknown Artist')
+            duration = info.get('duration', 0)
+            thumbnail = info.get('thumbnail', '')
+            url = info.get('url') # Direct audio URL
+            
+            # Clean up title (remove "Official Video", etc.)
+            clean_title = title.replace('(Official Video)', '').replace('[Official Video]', '').strip()
+            
+            # Try to parse Artist - Title
+            if '-' in clean_title:
+                parts = clean_title.split('-', 1)
+                artist = parts[0].strip()
+                track_title = parts[1].strip()
+            else:
+                artist = uploader
+                track_title = clean_title
+                
+            return Track(
+                id=f"yt_{video_id}",
+                title=track_title,
+                artist=artist,
+                duration=duration,
+                url=url, # This is the direct stream URL
+                image=thumbnail
+            )
+            
+    except Exception as e:
+        print(f"Error extracting YouTube info: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to process YouTube link: {str(e)}")
+
 # --- Lyrics Endpoints ---
 
 class LyricsResponse(BaseModel):

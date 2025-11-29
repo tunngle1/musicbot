@@ -16,6 +16,92 @@ const LibraryView: React.FC = () => {
     isPersisted: boolean;
   } | null>(null);
 
+  // YouTube State
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [isYoutubeLoading, setIsYoutubeLoading] = useState(false);
+  const [foundYoutubeTrack, setFoundYoutubeTrack] = useState<Track | null>(null);
+
+  const handleYoutubeSearch = async () => {
+    if (!youtubeUrl.trim()) return;
+    setIsYoutubeLoading(true);
+    setFoundYoutubeTrack(null);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/youtube/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: youtubeUrl })
+      });
+      if (!response.ok) throw new Error('Не удалось найти видео');
+      const track = await response.json();
+      setFoundYoutubeTrack(track);
+    } catch (e) {
+      alert('Ошибка: ' + e);
+    } finally {
+      setIsYoutubeLoading(false);
+    }
+  };
+
+  const handleYoutubeDownload = async (target: 'app' | 'chat') => {
+    if (!foundYoutubeTrack) return;
+    setIsYoutubeLoading(true);
+    
+    try {
+      if (target === 'app') {
+        // Download to App
+        const audioRes = await fetch(foundYoutubeTrack.url);
+        const audioBlob = await audioRes.blob();
+        const objectUrl = URL.createObjectURL(audioBlob);
+        
+        // Try to get cover blob
+        let coverBlob = null;
+        try {
+          const coverRes = await fetch(foundYoutubeTrack.image);
+          coverBlob = await coverRes.blob();
+        } catch (e) { console.warn("Failed to fetch cover", e); }
+
+        const newTrack: Track = {
+          ...foundYoutubeTrack,
+          audioUrl: objectUrl,
+          coverUrl: foundYoutubeTrack.image, // Keep original URL as fallback
+          isLocal: true
+        };
+
+        addTrack(newTrack);
+        await storage.saveTrack(newTrack, audioBlob, coverBlob);
+        
+        setLibraryTracks(prev => [newTrack, ...prev]);
+        setYoutubeUrl('');
+        setFoundYoutubeTrack(null);
+        alert('Трек сохранен в медиатеку!');
+      } else {
+        // Download to Chat
+        const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
+        if (!user) {
+          alert('Ошибка: Не удалось определить пользователя Telegram');
+          return;
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/download/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.id,
+            track: foundYoutubeTrack
+          })
+        });
+
+        if (!response.ok) throw new Error('Ошибка отправки в чат');
+        alert('Трек отправлен в чат!');
+        setYoutubeUrl('');
+        setFoundYoutubeTrack(null);
+      }
+    } catch (e) {
+      alert('Ошибка загрузки: ' + e);
+    } finally {
+      setIsYoutubeLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadLibraryTracks();
     loadStorageInfo();
@@ -126,6 +212,56 @@ const LibraryView: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* YouTube Download Section */}
+      <div className="bg-gradient-to-br from-red-500/10 to-orange-500/10 border border-white/10 rounded-xl p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+          <span className="text-red-500">▶</span> Скачать с YouTube
+        </h3>
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={youtubeUrl}
+            onChange={(e) => setYoutubeUrl(e.target.value)}
+            placeholder="Ссылка на видео..."
+            className="flex-1 bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500/50"
+          />
+          <button
+            onClick={handleYoutubeSearch}
+            disabled={isYoutubeLoading || !youtubeUrl}
+            className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {isYoutubeLoading ? '...' : 'Найти'}
+          </button>
+        </div>
+
+        {foundYoutubeTrack && (
+          <div className="bg-black/20 rounded-lg p-3 flex items-center gap-3 mt-2">
+            <img src={foundYoutubeTrack.image} alt="Cover" className="w-10 h-10 rounded object-cover" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-white truncate">{foundYoutubeTrack.title}</div>
+              <div className="text-xs text-gray-400 truncate">{foundYoutubeTrack.artist}</div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleYoutubeDownload('app')}
+                className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30"
+                title="Скачать в приложение"
+              >
+                <FileAudio size={18} />
+              </button>
+              <button
+                onClick={() => handleYoutubeDownload('chat')}
+                className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
+                title="Отправить в чат"
+              >
+                <Upload size={18} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Upload Area */}
       <div
