@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Play, Heart, MoreVertical } from 'lucide-react';
+import { Play, Heart, MoreVertical, Download } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { hapticFeedback } from '../utils/telegram';
 
 const FavoritesView: React.FC = () => {
-    const { favorites, playTrack, toggleFavorite, currentTrack, isPlaying } = usePlayer();
+    const { favorites, playTrack, toggleFavorite, currentTrack, isPlaying, playlists, addToPlaylist, downloadTrack } = usePlayer();
     const [showActionModal, setShowActionModal] = useState(false);
     const [trackToAction, setTrackToAction] = useState<any>(null);
 
@@ -90,6 +90,65 @@ const FavoritesView: React.FC = () => {
                     );
                 })}
             </div>
+
+            {/* Action Modal (Add to Playlist / Download) */}
+            {showActionModal && trackToAction && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in" onClick={() => setShowActionModal(false)}>
+                    <div className="bg-gray-900 w-full max-w-sm p-6 rounded-t-2xl sm:rounded-2xl border-t sm:border border-white/10 shadow-2xl transform transition-transform" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold mb-4 text-white">Добавить в плейлист</h3>
+
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                            {playlists.length === 0 ? (
+                                <div className="text-center text-gray-500 py-4">
+                                    Нет плейлистов. Создайте первый!
+                                </div>
+                            ) : (
+                                playlists.map(playlist => (
+                                    <button
+                                        key={playlist.id}
+                                        className="w-full flex items-center p-3 rounded-xl hover:bg-white/5 transition-colors text-left"
+                                        onClick={() => {
+                                            addToPlaylist(playlist.id, trackToAction);
+                                            setShowActionModal(false);
+                                            setTrackToAction(null);
+                                            hapticFeedback.success();
+                                        }}
+                                    >
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden mr-3">
+                                            <img src={playlist.coverUrl} alt={playlist.name} className="w-full h-full object-cover" />
+                                        </div>
+                                        <span className="text-white font-medium">{playlist.name}</span>
+                                    </button>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                            <button
+                                className="w-full py-3 bg-blue-600 rounded-xl font-medium text-white hover:bg-blue-500 transition-colors flex items-center justify-center gap-2"
+                                onClick={() => {
+                                    if (trackToAction) {
+                                        downloadTrack(trackToAction);
+                                        setShowActionModal(false);
+                                        setTrackToAction(null);
+                                        hapticFeedback.success();
+                                    }
+                                }}
+                            >
+                                <Download size={20} />
+                                Скачать трек
+                            </button>
+
+                            <button
+                                className="w-full py-3 bg-gray-800 rounded-xl font-medium text-gray-300 hover:bg-gray-700 transition-colors"
+                                onClick={() => setShowActionModal(false)}
+                            >
+                                Отмена
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

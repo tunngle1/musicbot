@@ -55,6 +55,8 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
   const touchStartY = useRef<number | null>(null);
   const lastTap = useRef<number>(0);
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const isDragging = useRef(false);
 
   // Dynamic Background State
   const [backgroundColor, setBackgroundColor] = useState<string>('#1a1a1a');
@@ -73,14 +75,35 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
   }, [coverUrl]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    e.stopPropagation(); // Prevent propagation to elements behind
+    e.stopPropagation();
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
+    isDragging.current = false;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartX.current || !touchStartY.current) return;
+
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+
+    const diffX = touchStartX.current - currentX;
+    const diffY = touchStartY.current - currentY;
+
+    // Only track vertical drag down
+    if (diffY < 0 && Math.abs(diffX) < 50) {
+      isDragging.current = true;
+      const offset = Math.abs(diffY);
+      setDragOffset(offset);
+    }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    e.stopPropagation(); // Prevent propagation to elements behind
-    if (!touchStartX.current || !touchStartY.current) return;
+    e.stopPropagation();
+    if (!touchStartX.current || !touchStartY.current) {
+      setDragOffset(0);
+      return;
+    }
 
     const touchEndX = e.changedTouches[0].clientX;
     const touchEndY = e.changedTouches[0].clientY;
@@ -88,30 +111,36 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
     const diffX = touchStartX.current - touchEndX;
     const diffY = touchStartY.current - touchEndY;
 
-    // Swipe Thresholds
-    const minSwipeDistance = 50;
-    const minCollapseSwipeDistance = 100; // Higher threshold for collapse to prevent accidental triggers
-    const maxVerticalForHorizontalSwipe = 50;
-    const maxHorizontalForVerticalSwipe = 50;
+    // If was dragging down
+    if (isDragging.current && diffY < 0) {
+      const swipeDistance = Math.abs(diffY);
+      const threshold = 150; // Distance to trigger close
 
-    // Horizontal Swipe (Next/Prev)
-    if (Math.abs(diffX) > minSwipeDistance && Math.abs(diffY) < maxVerticalForHorizontalSwipe) {
-      if (diffX > 0) {
-        // Swipe Left -> Next
-        nextTrack();
+      if (swipeDistance > threshold) {
+        // Close player
+        onCollapse();
       } else {
-        // Swipe Right -> Prev
-        prevTrack();
+        // Snap back
+        setDragOffset(0);
       }
-    }
-    // Vertical Swipe (Collapse) - requires longer swipe
-    else if (diffY < -minCollapseSwipeDistance && Math.abs(diffX) < maxHorizontalForVerticalSwipe) {
-      // Swipe Down -> Collapse
-      onCollapse();
+    } else {
+      // Horizontal Swipe (Next/Prev)
+      const minSwipeDistance = 50;
+      const maxVerticalForHorizontalSwipe = 50;
+
+      if (Math.abs(diffX) > minSwipeDistance && Math.abs(diffY) < maxVerticalForHorizontalSwipe) {
+        if (diffX > 0) {
+          nextTrack();
+        } else {
+          prevTrack();
+        }
+      }
     }
 
     touchStartX.current = null;
     touchStartY.current = null;
+    isDragging.current = false;
+    setDragOffset(0);
   };
 
   const handleDoubleTap = (e: React.MouseEvent | React.TouchEvent) => {
@@ -156,9 +185,14 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col items-center pt-safe pb-safe animate-fade-in overflow-hidden transition-colors duration-700"
-      style={{ backgroundColor }}
+      className="fixed inset-0 z-50 flex flex-col items-center pt-safe pb-safe overflow-hidden transition-colors duration-700"
+      style={{
+        backgroundColor,
+        transform: `translateY(${dragOffset}px)`,
+        transition: isDragging.current ? 'none' : 'transform 0.3s ease-out'
+      }}
       onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       {/* Dynamic Background */}
