@@ -42,28 +42,39 @@ const HomeView: React.FC = () => {
   // Отображаемые треки: результаты поиска или все треки
   const displayTracks = searchState.results.length > 0 ? searchState.results : (searchState.query.trim() ? [] : allTracks);
 
-  // Поиск с debounce
+  // Search with debounce
   useEffect(() => {
+    // If no query, clear results
     if (!searchState.query.trim()) {
-      // Clear results only if query is empty and we're not in genre mode
-      if (!searchState.genreId) {
+      if (searchState.results.length > 0) {
         setSearchState(prev => ({ ...prev, results: [], hasMore: true, error: null }));
       }
       return;
     }
+
+    // Store current search mode to check if it changed
+    const currentSearchMode = searchState.searchMode;
 
     const timeoutId = setTimeout(async () => {
       setSearchState(prev => ({ ...prev, isSearching: true, error: null, page: 1, genreId: null }));
 
       try {
         const results = await searchTracks(searchState.query, 20, 1, searchState.searchMode);
-        setSearchState(prev => ({
-          ...prev,
-          results,
-          hasMore: results.length >= 20,
-          isSearching: false,
-          error: results.length === 0 ? 'Ничего не найдено' : null
-        }));
+
+        // Only update results if search mode hasn't changed
+        setSearchState(prev => {
+          if (prev.searchMode !== currentSearchMode) {
+            // Search mode changed, ignore these results
+            return prev;
+          }
+          return {
+            ...prev,
+            results,
+            hasMore: results.length >= 20,
+            isSearching: false,
+            error: results.length === 0 ? 'Ничего не найдено' : null
+          };
+        });
       } catch (err) {
         console.error('Search error:', err);
         setSearchState(prev => ({

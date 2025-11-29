@@ -189,7 +189,9 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
       style={{
         backgroundColor,
         transform: `translateY(${dragOffset}px)`,
-        transition: isDragging.current ? 'none' : 'transform 0.3s ease-out'
+        transition: isDragging.current
+          ? 'none'
+          : 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.7s ease'
       }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
