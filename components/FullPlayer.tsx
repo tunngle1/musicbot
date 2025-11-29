@@ -90,6 +90,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
 
     // Swipe Thresholds
     const minSwipeDistance = 50;
+    const minCollapseSwipeDistance = 100; // Higher threshold for collapse to prevent accidental triggers
     const maxVerticalForHorizontalSwipe = 50;
     const maxHorizontalForVerticalSwipe = 50;
 
@@ -103,8 +104,8 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
         prevTrack();
       }
     }
-    // Vertical Swipe (Collapse)
-    else if (diffY < -minSwipeDistance && Math.abs(diffX) < maxHorizontalForVerticalSwipe) {
+    // Vertical Swipe (Collapse) - requires longer swipe
+    else if (diffY < -minCollapseSwipeDistance && Math.abs(diffX) < maxHorizontalForVerticalSwipe) {
       // Swipe Down -> Collapse
       onCollapse();
     }

@@ -53,7 +53,10 @@ const LyricsModal: React.FC<LyricsModalProps> = ({
                 </div>
 
                 {/* Content - Scrollable */}
-                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                <div
+                    className="flex-1 overflow-y-auto p-6 custom-scrollbar"
+                    onTouchMove={(e) => e.stopPropagation()}
+                >
                     {isLoading && (
                         <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                             <Loader2 size={48} className="animate-spin mb-4 text-blue-500" />
