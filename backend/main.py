@@ -392,34 +392,45 @@ async def grant_rights(
         
     db.commit()
     
-    # Если премиум был отозван, запланировать удаление треков через 24 часа
+    # Если премиум был отозван, запланировать удаление треков через 1 минуту (для тестирования)
     if was_premium and (request.is_premium == False or request.is_premium_pro == False):
-        # Установить таймер на удаление через 24 часа
+        # Установить таймер на удаление через 1 минуту
         now = datetime.utcnow()
         target_user.subscription_expired_at = now
-        target_user.tracks_deletion_scheduled_at = now + timedelta(hours=24)
+        target_user.tracks_deletion_scheduled_at = now + timedelta(minutes=1)  # Изменено на 1 минуту для тестирования
         db.commit()
+        
+        print(f"⚠️ Premium revoked for user {request.user_id}, tracks will be deleted in 1 minute")
         
         # Отправить уведомление пользователю
         if BOT_TOKEN:
             try:
                 message = (
                     "⚠️ <b>Ваша подписка истекла</b>\n\n"
-                    "Все скачанные треки будут удалены через 24 часа.\n"
+                    "Все скачанные треки будут удалены через 1 минуту (тестовый режим).\n"
                     "Оформите подписку, чтобы сохранить их!\n\n"
                     "💎 <b>Premium</b> - треки защищены от пересылки\n"
                     "👑 <b>Premium Pro</b> - можно пересылать треки друзьям"
                 )
                 
+                print(f"📤 Sending notification to user {request.user_id}...")
+                
                 telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    await client.post(telegram_url, json={
+                    response = await client.post(telegram_url, json={
                         'chat_id': request.user_id,
                         'text': message,
                         'parse_mode': 'HTML'
                     })
+                    
+                    if response.status_code == 200:
+                        print(f"✅ Notification sent successfully to user {request.user_id}")
+                    else:
+                        print(f"❌ Failed to send notification: {response.status_code} - {response.text}")
             except Exception as e:
-                print(f"Failed to send expiration warning to user {request.user_id}: {e}")
+                print(f"❌ Exception while sending notification to user {request.user_id}: {e}")
+        else:
+            print(f"⚠️ BOT_TOKEN not configured, skipping notification")
     
     return {"status": "ok", "message": f"Rights updated for user {request.user_id}"}
 
