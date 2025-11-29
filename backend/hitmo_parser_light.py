@@ -29,7 +29,7 @@ class HitmoParser:
         try:
             params = {
                 'q': query,
-                'start': (page - 1) * 48 # Hitmo usually shows 48 tracks per page
+                'start': (page - 1) * limit # Use limit for offset calculation
             }
             
             async with httpx.AsyncClient(headers=self.headers, timeout=10.0) as client:
@@ -155,7 +155,7 @@ class HitmoParser:
         try:
             url = f"{self.BASE_URL}/genre/{genre_id}"
             params = {
-                'start': (page - 1) * 48
+                'start': (page - 1) * limit
             }
             
             async with httpx.AsyncClient(headers=self.headers, timeout=10.0, follow_redirects=True) as client:

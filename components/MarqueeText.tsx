@@ -26,7 +26,7 @@ const MarqueeText: React.FC<MarqueeTextProps> = ({ text, className = '' }) => {
 
     return (
         <div ref={containerRef} className={`marquee-container ${className}`}>
-            <div ref={textRef} className={needsMarquee ? 'marquee' : ''}>
+            <div ref={textRef} className={`whitespace-nowrap ${needsMarquee ? 'marquee' : 'truncate'}`}>
                 {text}
                 {needsMarquee && <span className="ml-8">{text}</span>}
             </div>
