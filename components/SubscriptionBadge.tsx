@@ -10,41 +10,8 @@ const SubscriptionBadge: React.FC<SubscriptionBadgeProps> = ({ user }) => {
 
     const { reason, days_left } = user.subscription_status;
 
-    // Не показываем бадж для админов
-    if (reason === 'admin') return null;
-
-    const getBadgeConfig = () => {
-        switch (reason) {
-            case 'premium_pro':
-                return {
-                    text: '👑 Premium Pro',
-                    bgColor: 'from-purple-500/20 to-pink-500/20',
-                    borderColor: 'border-purple-500/30',
-                    textColor: 'text-purple-300',
-                    glow: 'shadow-purple-500/20'
-                };
-            case 'premium':
-                return {
-                    text: '💎 Premium',
-                    bgColor: 'from-yellow-500/20 to-amber-500/20',
-                    borderColor: 'border-yellow-500/30',
-                    textColor: 'text-yellow-300',
-                    glow: 'shadow-yellow-500/20'
-                };
-            case 'trial':
-                const isExpiringSoon = days_left !== undefined && days_left <= 1;
-                return {
-                    text: `🎁 Пробный период: ${days_left} ${getDaysWord(days_left || 0)}`,
-                    bgColor: isExpiringSoon ? 'from-red-500/20 to-orange-500/20' : 'from-blue-500/20 to-cyan-500/20',
-                    borderColor: isExpiringSoon ? 'border-red-500/30' : 'border-blue-500/30',
-                    textColor: isExpiringSoon ? 'text-red-300' : 'text-blue-300',
-                    glow: isExpiringSoon ? 'shadow-red-500/20' : 'shadow-blue-500/20',
-                    warning: isExpiringSoon
-                };
-            default:
-                return null;
-        }
-    };
+    // Показываем только для пробного периода
+    if (reason !== 'trial') return null;
 
     const getDaysWord = (days: number): string => {
         if (days === 1) return 'день';
@@ -52,35 +19,35 @@ const SubscriptionBadge: React.FC<SubscriptionBadgeProps> = ({ user }) => {
         return 'дней';
     };
 
-    const config = getBadgeConfig();
-    if (!config) return null;
+    const isExpiringSoon = days_left !== undefined && days_left <= 1;
 
     return (
         <div className="mb-4 px-4">
             <div
                 className={`
-          glass rounded-2xl p-4 border
-          bg-gradient-to-r ${config.bgColor}
-          ${config.borderColor}
-          shadow-lg ${config.glow}
+          rounded-2xl p-4 border
+          ${isExpiringSoon
+                        ? 'bg-red-500/10 border-red-500/20'
+                        : 'bg-white/5 border-white/10'
+                    }
           transition-all duration-300
-          ${config.warning ? 'animate-pulse' : ''}
+          ${isExpiringSoon ? 'animate-pulse' : ''}
         `}
             >
                 <div className="flex items-center justify-between">
-                    <span className={`font-semibold ${config.textColor}`}>
-                        {config.text}
+                    <span className={`font-semibold ${isExpiringSoon ? 'text-red-300' : 'text-white/60'}`}>
+                        🎁 Пробный период: {days_left} {getDaysWord(days_left || 0)}
                     </span>
 
-                    {config.warning && (
+                    {isExpiringSoon && (
                         <span className="text-xs text-red-400 font-medium">
                             ⚠️ Скоро истечет
                         </span>
                     )}
                 </div>
 
-                {reason === 'trial' && days_left !== undefined && days_left > 1 && (
-                    <p className="text-xs text-gray-400 mt-2">
+                {days_left !== undefined && days_left > 1 && (
+                    <p className="text-xs text-white/40 mt-2">
                         Оформите премиум-подписку для продолжения использования сервиса
                     </p>
                 )}

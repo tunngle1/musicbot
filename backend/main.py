@@ -219,6 +219,7 @@ async def auth_user(user_data: UserAuth, db: Session = Depends(get_db)):
     if user.id == 414153884:
         user.is_admin = True
         user.is_premium = True
+        user.is_premium_pro = True
     
     db.commit()
     db.refresh(user)
@@ -250,6 +251,7 @@ async def auth_user(user_data: UserAuth, db: Session = Depends(get_db)):
             "id": user.id,
             "is_admin": user.is_admin,
             "is_premium": user.is_premium,
+            "is_premium_pro": user.is_premium_pro,
             "subscription_status": subscription_status
         }
     }
@@ -398,8 +400,26 @@ async def grant_rights(
         target_user.tracks_deletion_scheduled_at = now + timedelta(hours=24)
         db.commit()
         
-        # TODO: Отправить уведомление пользователю о том, что треки будут удалены через 24 часа
-        # Для этого потребуется реализовать фоновую задачу с APScheduler
+        # Отправить уведомление пользователю
+        if BOT_TOKEN:
+            try:
+                message = (
+                    "⚠️ <b>Ваша подписка истекла</b>\n\n"
+                    "Все скачанные треки будут удалены через 24 часа.\n"
+                    "Оформите подписку, чтобы сохранить их!\n\n"
+                    "💎 <b>Premium</b> - треки защищены от пересылки\n"
+                    "👑 <b>Premium Pro</b> - можно пересылать треки друзьям"
+                )
+                
+                telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await client.post(telegram_url, json={
+                        'chat_id': request.user_id,
+                        'text': message,
+                        'parse_mode': 'HTML'
+                    })
+            except Exception as e:
+                print(f"Failed to send expiration warning to user {request.user_id}: {e}")
     
     return {"status": "ok", "message": f"Rights updated for user {request.user_id}"}
 
