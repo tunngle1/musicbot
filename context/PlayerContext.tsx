@@ -170,10 +170,59 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // ... (Auth and Load Data omitted)
 
+  // Load more tracks function
+  const loadMoreTracks = async () => {
+    const currentSearchState = searchStateRef.current;
+    if (!currentSearchState.hasMore || currentSearchState.isSearching || (!currentSearchState.query.trim() && !currentSearchState.genreId)) return;
+
+    console.log("Pre-loading more tracks...");
+    // Set loading state to prevent multiple fetches
+    setSearchState(prev => ({ ...prev, isSearching: true }));
+
+    try {
+      const nextPage = currentSearchState.page + 1;
+      let newTracks: Track[] = [];
+
+      if (currentSearchState.genreId) {
+        newTracks = await getGenreTracks(currentSearchState.genreId, 20, nextPage);
+      } else {
+        newTracks = await searchTracks(currentSearchState.query, currentSearchState.searchMode, 20, nextPage);
+      }
+
+      if (newTracks.length > 0) {
+        setSearchState(prev => ({
+          ...prev,
+          results: [...prev.results, ...newTracks],
+          page: nextPage,
+          hasMore: newTracks.length >= 20,
+          isSearching: false
+        }));
+
+        setQueue(prev => [...prev, ...newTracks]);
+      } else {
+        setSearchState(prev => ({ ...prev, hasMore: false, isSearching: false }));
+      }
+    } catch (e) {
+      console.error("Failed to load more tracks:", e);
+      setSearchState(prev => ({ ...prev, isSearching: false }));
+    }
+  };
+
+  // Pre-fetch effect
+  useEffect(() => {
+    if (!currentTrack || queue.length === 0) return;
+    const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
+    const tracksRemaining = queue.length - 1 - currentIndex;
+
+    // Load more if we are within 3 tracks of the end
+    if (tracksRemaining < 3) {
+      loadMoreTracks();
+    }
+  }, [currentTrack, queue]);
+
   const nextTrack = async () => {
     const currentTrackVal = currentTrackRef.current;
     const currentQueue = queueRef.current;
-    const currentSearchState = searchStateRef.current;
     const isShuffleVal = isShuffleRef.current;
     const repeatModeVal = repeatModeRef.current;
 
@@ -189,42 +238,6 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     if (currentIndex < currentQueue.length - 1) {
       playTrack(currentQueue[currentIndex + 1]);
-    } else if (currentSearchState.hasMore && !currentSearchState.isSearching && (currentSearchState.query.trim() || currentSearchState.genreId)) {
-      console.log("End of queue reached, loading more tracks...");
-
-      try {
-        const nextPage = currentSearchState.page + 1;
-        let newTracks: Track[] = [];
-
-        if (currentSearchState.genreId) {
-          newTracks = await getGenreTracks(currentSearchState.genreId, 20, nextPage);
-        } else {
-          newTracks = await searchTracks(currentSearchState.query, currentSearchState.searchMode, 20, nextPage);
-        }
-
-        if (newTracks.length > 0) {
-          setSearchState(prev => ({
-            ...prev,
-            results: [...prev.results, ...newTracks],
-            page: nextPage,
-            hasMore: newTracks.length >= 20
-          }));
-
-          const updatedQueue = [...currentQueue, ...newTracks];
-          setQueue(updatedQueue);
-          playTrack(newTracks[0], updatedQueue);
-        } else {
-          setSearchState(prev => ({ ...prev, hasMore: false }));
-          if (repeatModeVal === 'all') {
-            playTrack(currentQueue[0]);
-          } else {
-            setIsPlaying(false);
-            if (audioRef.current) audioRef.current.currentTime = 0;
-          }
-        }
-      } catch (e) {
-        console.error("Failed to load more tracks:", e);
-      }
     } else if (repeatModeVal === 'all') {
       playTrack(currentQueue[0]);
     } else {
