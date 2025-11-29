@@ -63,6 +63,8 @@ class UserStats(BaseModel):
     premium_users: int
     admin_users: int
     new_users_today: int
+    total_revenue_ton: float
+    total_revenue_stars: int
 
 class CreateInvoiceRequest(BaseModel):
     user_id: int
@@ -303,7 +305,7 @@ async def get_subscription_status(user_id: int = Query(...), db: Session = Depen
 @app.get("/api/admin/stats", response_model=UserStats)
 async def get_stats(user_id: int = Query(...), db: Session = Depends(get_db)):
     """Получение статистики (только для админов)"""
-    from backend.database import Payment
+    from database import Payment
     
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_admin:
@@ -532,6 +534,16 @@ async def startup_event():
     asyncio.create_task(background_deletion_task())
 
 # --- Payment Endpoints ---
+
+@app.get("/api/payment/config")
+async def get_payment_config():
+    """Получение конфигурации платежей (адрес кошелька TON и т.д.)"""
+    from payments import TON_WALLET_ADDRESS, TON_PRICE_MONTH, TON_PRICE_YEAR
+    return {
+        "ton_wallet_address": TON_WALLET_ADDRESS,
+        "ton_price_month": TON_PRICE_MONTH,
+        "ton_price_year": TON_PRICE_YEAR
+    }
 
 @app.post("/api/payment/stars/create")
 async def create_stars_invoice_endpoint(request: CreateInvoiceRequest):

@@ -80,20 +80,21 @@ const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
 
         setIsLoading(true);
         try {
+            // Получаем конфигурацию платежей с бэкенда
+            const configResponse = await fetch(`${API_BASE_URL}/api/payment/config`);
+            if (!configResponse.ok) {
+                throw new Error('Failed to fetch payment config');
+            }
+            const config = await configResponse.json();
+
             // Сумма в нано-тонах (1 TON = 1,000,000,000 nanotons)
             const amountNano = (selectedPlan.priceTon * 1000000000).toString();
-
-            // Адрес получателя (магазина) - должен быть в .env на бэкенде, но здесь нужен для формирования транзакции
-            // В реальном приложении лучше получать параметры транзакции с бэкенда
-            // Для теста используем адрес из бэкенда (нужно сделать endpoint для получения конфига)
-            // Пока хардкод для теста (замените на свой тестовый кошелек!)
-            const destinationAddress = "0QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC"; // ЗАГЛУШКА!
 
             const transaction = {
                 validUntil: Math.floor(Date.now() / 1000) + 600, // 10 минут
                 messages: [
                     {
-                        address: destinationAddress,
+                        address: config.ton_wallet_address,
                         amount: amountNano,
                         // payload: ... (можно добавить комментарий с ID пользователя)
                     }
