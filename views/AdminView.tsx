@@ -460,6 +460,85 @@ const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                                 </button>
                             </div>
 
+                            {/* Trial Period Controls */}
+                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 space-y-3">
+                                <div className="flex items-center gap-2 text-blue-400 font-bold text-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    Пробный период
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (targetId) {
+                                                const body = { user_id: parseInt(targetId), trial_days: 3 };
+                                                fetch(`${API_BASE_URL}/api/admin/grant?admin_id=${user?.id}`, {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify(body)
+                                                }).then(res => {
+                                                    if (res.ok) {
+                                                        setMessage({ type: 'success', text: 'Триал на 3 дня выдан' });
+                                                        setTimeout(() => setMessage(null), 3000);
+                                                    }
+                                                });
+                                            }
+                                        }}
+                                        disabled={!targetId}
+                                        className="flex-1 py-2 bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-blue-400 rounded-lg text-xs font-bold transition-colors"
+                                    >
+                                        +3 дня
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (targetId) {
+                                                const body = { user_id: parseInt(targetId), trial_days: 7 };
+                                                fetch(`${API_BASE_URL}/api/admin/grant?admin_id=${user?.id}`, {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify(body)
+                                                }).then(res => {
+                                                    if (res.ok) {
+                                                        setMessage({ type: 'success', text: 'Триал на 7 дней выдан' });
+                                                        setTimeout(() => setMessage(null), 3000);
+                                                    }
+                                                });
+                                            }
+                                        }}
+                                        disabled={!targetId}
+                                        className="flex-1 py-2 bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-blue-400 rounded-lg text-xs font-bold transition-colors"
+                                    >
+                                        +7 дней
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (targetId) {
+                                                const body = { user_id: parseInt(targetId), trial_days: 0 };
+                                                fetch(`${API_BASE_URL}/api/admin/grant?admin_id=${user?.id}`, {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify(body)
+                                                }).then(res => {
+                                                    if (res.ok) {
+                                                        setMessage({ type: 'success', text: 'Триал отменен' });
+                                                        setTimeout(() => setMessage(null), 3000);
+                                                    }
+                                                });
+                                            }
+                                        }}
+                                        disabled={!targetId}
+                                        className="flex-1 py-2 bg-red-500/20 hover:bg-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-red-400 rounded-lg text-xs font-bold transition-colors"
+                                    >
+                                        Отменить
+                                    </button>
+                                </div>
+                            </div>
+
                             <button
                                 type="submit"
                                 disabled={!targetId}

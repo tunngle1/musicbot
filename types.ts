@@ -30,6 +30,13 @@ export interface User {
   last_name?: string;
   is_admin: boolean;
   is_premium: boolean;
+  subscription_status?: {
+    has_access: boolean;
+    reason: 'admin' | 'premium' | 'trial' | 'expired' | 'blocked';
+    trial_expires_at?: string;
+    premium_expires_at?: string;
+    days_left?: number;
+  };
 }
 
 export interface Lyrics {

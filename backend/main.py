@@ -65,6 +65,8 @@ class GrantRequest(BaseModel):
     is_admin: Optional[bool] = None
     is_premium: Optional[bool] = None
     is_blocked: Optional[bool] = None
+    trial_days: Optional[int] = None  # Количество дней пробного периода
+    premium_days: Optional[int] = None  # Количество дней премиум подписки
 
 class CacheStats(BaseModel):
     total_entries: int
@@ -148,18 +150,59 @@ async def health_check():
         "service": "telegram-music-api"
     }
 
+# --- Access Control Helper ---
+
+def has_access(user: User) -> tuple[bool, str, dict]:
+    """
+    Проверяет, имеет ли пользователь доступ к сервису.
+    
+    Returns:
+        (has_access: bool, reason: str, details: dict)
+    """
+    if user.is_blocked:
+        return False, "blocked", {}
+    
+    if user.is_admin:
+        return True, "admin", {}
+    
+    if user.is_premium:
+        return True, "premium", {}
+    
+    # Проверка пробного периода
+    if user.trial_expires_at:
+        now = datetime.utcnow()
+        if now < user.trial_expires_at:
+            days_left = (user.trial_expires_at - now).days
+            return True, "trial", {
+                "trial_expires_at": user.trial_expires_at.isoformat(),
+                "days_left": days_left
+            }
+    
+    return False, "expired", {}
+
 # --- User & Admin Endpoints ---
 
 @app.post("/api/user/auth")
 async def auth_user(user_data: UserAuth, db: Session = Depends(get_db)):
     """Регистрация или обновление данных пользователя"""
+    from datetime import timedelta
+    
     user = db.query(User).filter(User.id == user_data.id).first()
+    is_new_user = False
+    
     if not user:
+        is_new_user = True
+        # Новый пользователь - создаем с пробным периодом
+        now = datetime.utcnow()
+        trial_expires = now + timedelta(days=3)
+        
         user = User(
             id=user_data.id,
             username=user_data.username,
             first_name=user_data.first_name,
-            last_name=user_data.last_name
+            last_name=user_data.last_name,
+            trial_started_at=now,
+            trial_expires_at=trial_expires
         )
         db.add(user)
     else:
@@ -176,16 +219,52 @@ async def auth_user(user_data: UserAuth, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     
-    # Check if user is blocked
+    # Проверяем доступ
+    has_access_result, reason, details = has_access(user)
+    
+    # Формируем ответ с информацией о подписке
+    subscription_status = {
+        "has_access": has_access_result,
+        "reason": reason,
+        **details
+    }
+    
+    # Если пользователь заблокирован, возвращаем ошибку
     if user.is_blocked:
-        raise HTTPException(status_code=403, detail="Access denied: User is blocked")
+        raise HTTPException(
+            status_code=403, 
+            detail={
+                "message": "Access denied: User is blocked",
+                "subscription_status": subscription_status
+            }
+        )
     
     return {
         "status": "ok",
+        "is_new_user": is_new_user,
         "user": {
             "id": user.id,
             "is_admin": user.is_admin,
-            "is_premium": user.is_premium
+            "is_premium": user.is_premium,
+            "subscription_status": subscription_status
+        }
+    }
+
+@app.get("/api/user/subscription-status")
+async def get_subscription_status(user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Получение детальной информации о статусе подписки"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    has_access_result, reason, details = has_access(user)
+    
+    return {
+        "status": "ok",
+        "subscription_status": {
+            "has_access": has_access_result,
+            "reason": reason,
+            **details
         }
     }
 
@@ -252,6 +331,8 @@ async def grant_rights(
     db: Session = Depends(get_db)
 ):
     """Выдача прав (только для админов)"""
+    from datetime import timedelta
+    
     SUPER_ADMIN_ID = 414153884  # Super admin cannot be modified
     
     admin = db.query(User).filter(User.id == admin_id).first()
@@ -279,6 +360,26 @@ async def grant_rights(
     
     if request.is_premium is not None:
         target_user.is_premium = request.is_premium
+    
+    # Управление пробным периодом
+    if request.trial_days is not None:
+        if request.trial_days > 0:
+            now = datetime.utcnow()
+            target_user.trial_started_at = now
+            target_user.trial_expires_at = now + timedelta(days=request.trial_days)
+        else:
+            # Отменить пробный период
+            target_user.trial_started_at = None
+            target_user.trial_expires_at = None
+    
+    # Управление премиум подпиской
+    if request.premium_days is not None:
+        if request.premium_days > 0:
+            now = datetime.utcnow()
+            target_user.premium_expires_at = now + timedelta(days=request.premium_days)
+        else:
+            # Отменить премиум подписку
+            target_user.premium_expires_at = None
         
     db.commit()
     

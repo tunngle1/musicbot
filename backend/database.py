@@ -23,6 +23,13 @@ class User(Base):
     is_premium = Column(Boolean, default=False)
     is_blocked = Column(Boolean, default=False)  # New field for access control
     joined_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Trial period fields
+    trial_started_at = Column(DateTime, nullable=True)
+    trial_expires_at = Column(DateTime, nullable=True)
+    
+    # Premium subscription field (for future use)
+    premium_expires_at = Column(DateTime, nullable=True)
 
 class DownloadedMessage(Base):
     __tablename__ = "downloaded_messages"

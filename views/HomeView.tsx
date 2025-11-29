@@ -5,6 +5,7 @@ import { Track } from '../types';
 import { searchTracks, getGenreTracks, downloadToChat } from '../utils/api';
 import { hapticFeedback, getTelegramUser } from '../utils/telegram';
 import { deduplicateTracks } from '../utils/deduplication';
+import SubscriptionBadge from '../components/SubscriptionBadge';
 
 const HomeView: React.FC = () => {
   const {
@@ -194,6 +195,9 @@ const HomeView: React.FC = () => {
           TG
         </div>
       </div>
+
+      {/* Subscription Badge */}
+      <SubscriptionBadge user={user} />
 
       {/* Search Bar */}
       <div className="relative">

@@ -4,6 +4,7 @@ import { ViewState } from './types';
 import BottomNav from './components/BottomNav';
 import MiniPlayer from './components/MiniPlayer';
 import FullPlayer from './components/FullPlayer';
+import SubscriptionBlocker from './components/SubscriptionBlocker';
 import HomeView from './views/HomeView';
 import PlaylistsView from './views/PlaylistsView';
 import FavoritesView from './views/FavoritesView';
@@ -15,7 +16,7 @@ import { initTelegramWebApp } from './utils/telegram';
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.HOME);
   const [isFullPlayerOpen, setIsFullPlayerOpen] = useState(false);
-  const { currentTrack, resetSearch, user } = usePlayer();
+  const { currentTrack, resetSearch, user, refreshSubscriptionStatus } = usePlayer();
 
   const handleNavigate = (view: ViewState) => {
     if (view === ViewState.HOME && currentView === ViewState.HOME) {
@@ -23,6 +24,9 @@ const AppContent: React.FC = () => {
     }
     setCurrentView(view);
   };
+
+  // Проверка доступа
+  const hasAccess = user?.subscription_status?.has_access ?? true;
 
   // Инициализация Telegram WebApp
   useEffect(() => {
@@ -119,6 +123,11 @@ const AppContent: React.FC = () => {
       document.removeEventListener('touchend', onTouchEnd);
     };
   }, []);
+
+  // Если нет доступа, показываем блокировщик
+  if (!hasAccess) {
+    return <SubscriptionBlocker user={user} onRefresh={refreshSubscriptionStatus} />;
+  }
 
   const renderView = () => {
     switch (currentView) {

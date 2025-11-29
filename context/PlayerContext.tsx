@@ -60,6 +60,7 @@ interface PlayerContextType {
   resetSearch: () => void;
   // User State
   user: User | null;
+  refreshSubscriptionStatus: () => Promise<void>;
   // Favorites
   favorites: Track[];
   toggleFavorite: (track: Track) => Promise<void>;
@@ -153,6 +154,24 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       searchMode: 'all',
       genreId: null
     });
+  };
+
+  // Refresh subscription status
+  const refreshSubscriptionStatus = async () => {
+    if (!user) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/user/subscription-status?user_id=${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUser(prev => prev ? {
+          ...prev,
+          subscription_status: data.subscription_status
+        } : null);
+      }
+    } catch (e) {
+      console.error('Failed to refresh subscription status:', e);
+    }
   };
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -881,6 +900,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setSearchState,
       resetSearch,
       user,
+      refreshSubscriptionStatus,
       favorites,
       toggleFavorite,
       favoriteRadios,
