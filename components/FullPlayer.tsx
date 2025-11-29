@@ -5,6 +5,7 @@ import { formatTime } from '../utils/format';
 import { getLyrics } from '../utils/api';
 import LyricsModal from './LyricsModal';
 import MarqueeText from './MarqueeText';
+import ArtistSelectorModal from './ArtistSelectorModal';
 
 
 interface FullPlayerProps {
@@ -36,6 +37,9 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
   const [lyrics, setLyrics] = useState<string | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [lyricsError, setLyricsError] = useState<string | null>(null);
+
+  // Artist selector state
+  const [showArtistSelector, setShowArtistSelector] = useState(false);
 
   const handleShowLyrics = async () => {
     if (!currentTrack) return;
@@ -111,7 +115,7 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
         <div className="w-full px-8 pb-12 flex flex-col space-y-8">
 
           <div className="flex justify-between items-start gap-4">
-            <div className="space-y-2 flex-1 min-w-0">
+            <div className="space-y-1 flex-1 min-w-0">
               <MarqueeText
                 text={title || ''}
                 className="text-2xl font-bold text-white leading-tight text-glow"
@@ -119,14 +123,23 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
               <div
                 onClick={() => {
                   if (!isRadioMode && currentTrack) {
-                    onCollapse();
-                    setSearchState(prev => ({
-                      ...prev,
-                      query: currentTrack.artist,
-                      isArtistSearch: true,
-                      results: [],
-                      genreId: null
-                    }));
+                    // Split artists by comma and filter
+                    const artists = currentTrack.artist.split(',').map(a => a.trim()).filter(a => a);
+
+                    if (artists.length > 1) {
+                      // Multiple artists - show selector
+                      setShowArtistSelector(true);
+                    } else {
+                      // Single artist - search directly
+                      onCollapse();
+                      setSearchState(prev => ({
+                        ...prev,
+                        query: currentTrack.artist,
+                        isArtistSearch: true,
+                        results: [],
+                        genreId: null
+                      }));
+                    }
                   }
                 }}
                 className={!isRadioMode ? "cursor-pointer hover:text-blue-400 transition-colors" : ""}
@@ -243,6 +256,23 @@ const FullPlayer: React.FC<FullPlayerProps> = ({ onCollapse }) => {
         lyrics={lyrics}
         isLoading={lyricsLoading}
         error={lyricsError}
+      />
+
+      {/* Artist Selector Modal */}
+      <ArtistSelectorModal
+        isOpen={showArtistSelector}
+        onClose={() => setShowArtistSelector(false)}
+        artists={currentTrack?.artist.split(',').map(a => a.trim()).filter(a => a) || []}
+        onSelectArtist={(artist) => {
+          onCollapse();
+          setSearchState(prev => ({
+            ...prev,
+            query: artist,
+            isArtistSearch: true,
+            results: [],
+            genreId: null
+          }));
+        }}
       />
     </div>
   );

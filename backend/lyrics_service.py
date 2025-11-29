@@ -156,6 +156,22 @@ class LyricsService:
         Returns:
             Cleaned lyrics text
         """
+        # First check: if lyrics look like a playlist (many lines with " - " separator)
+        lines_with_dash = sum(1 for line in lyrics.split('\n') if ' - ' in line and len(line) < 100)
+        total_lines = len([l for l in lyrics.split('\n') if l.strip()])
+        
+        # If more than 30% of lines have " - " pattern, it's likely a playlist
+        if total_lines > 20 and lines_with_dash / max(total_lines, 1) > 0.3:
+            print("Detected playlist format, rejecting lyrics")
+            return ""
+        
+        # Check for common playlist indicators
+        playlist_keywords = ['playlist', 'tracklist', 'feel free to comment', 'must play', 'explicit']
+        keyword_count = sum(1 for keyword in playlist_keywords if keyword.lower() in lyrics.lower())
+        if keyword_count >= 2:
+            print("Detected playlist keywords, rejecting lyrics")
+            return ""
+        
         lines = lyrics.split('\n')
         cleaned_lines = []
         

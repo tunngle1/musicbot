@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Play, Pause, Radio } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import MarqueeText from './MarqueeText';
+import ArtistSelectorModal from './ArtistSelectorModal';
 
 interface MiniPlayerProps {
   onExpand: () => void;
@@ -9,6 +10,7 @@ interface MiniPlayerProps {
 
 const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   const { currentTrack, currentRadio, isRadioMode, isPlaying, togglePlay, duration, currentTime, setSearchState } = usePlayer();
+  const [showArtistSelector, setShowArtistSelector] = useState(false);
 
   if (!currentTrack && !currentRadio) return null;
 
@@ -52,14 +54,24 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
           onClick={(e) => {
             if (!isRadioMode && currentTrack) {
               e.stopPropagation();
-              onExpand();
-              setSearchState(prev => ({
-                ...prev,
-                query: currentTrack.artist,
-                isArtistSearch: true,
-                results: [],
-                genreId: null
-              }));
+
+              // Split artists by comma and filter
+              const artists = currentTrack.artist.split(',').map(a => a.trim()).filter(a => a);
+
+              if (artists.length > 1) {
+                // Multiple artists - show selector
+                setShowArtistSelector(true);
+              } else {
+                // Single artist - search directly
+                onExpand();
+                setSearchState(prev => ({
+                  ...prev,
+                  query: currentTrack.artist,
+                  isArtistSearch: true,
+                  results: [],
+                  genreId: null
+                }));
+              }
             }
           }}
           className={!isRadioMode ? "cursor-pointer hover:text-blue-400 transition-colors" : ""}
@@ -80,6 +92,23 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
       >
         {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
       </button>
+
+      {/* Artist Selector Modal */}
+      <ArtistSelectorModal
+        isOpen={showArtistSelector}
+        onClose={() => setShowArtistSelector(false)}
+        artists={currentTrack?.artist.split(',').map(a => a.trim()).filter(a => a) || []}
+        onSelectArtist={(artist) => {
+          onExpand();
+          setSearchState(prev => ({
+            ...prev,
+            query: artist,
+            isArtistSearch: true,
+            results: [],
+            genreId: null
+          }));
+        }}
+      />
     </div>
   );
 };
