@@ -87,6 +87,18 @@ const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
             }
             const config = await configResponse.json();
 
+            // Нормализуем адрес: убираем дефисы и подчеркивания, если есть
+            let walletAddress = config.ton_wallet_address;
+
+            // Если адрес содержит дефисы или подчеркивания (URL-safe формат),
+            // конвертируем в стандартный base64
+            if (walletAddress.includes('-') || walletAddress.includes('_')) {
+                walletAddress = walletAddress.replace(/-/g, '+').replace(/_/g, '/');
+            }
+
+            console.log('Original address:', config.ton_wallet_address);
+            console.log('Normalized address:', walletAddress);
+
             // Сумма в нано-тонах (1 TON = 1,000,000,000 nanotons)
             const amountNano = (selectedPlan.priceTon * 1000000000).toString();
 
@@ -94,14 +106,18 @@ const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
                 validUntil: Math.floor(Date.now() / 1000) + 600, // 10 минут
                 messages: [
                     {
-                        address: config.ton_wallet_address,
+                        address: walletAddress,
                         amount: amountNano,
                         // payload: ... (можно добавить комментарий с ID пользователя)
                     }
                 ]
             };
 
+            console.log('Sending transaction:', transaction);
+
             const result = await tonConnectUI.sendTransaction(transaction);
+
+            console.log('Transaction sent, BOC:', result.boc);
 
             // Отправляем BOC на бэкенд для проверки
             const response = await fetch(`${API_BASE_URL}/api/payment/ton/verify`, {
