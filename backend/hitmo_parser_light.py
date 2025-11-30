@@ -4,27 +4,54 @@ import re
 from typing import List, Dict, Optional
 import urllib.parse
 import asyncio
+import os
+import random
 
 class HitmoParser:
     """
     Lightweight parser for Hitmo using httpx and BeautifulSoup.
     Suitable for Vercel/Serverless environments.
+    Supports proxy rotation and custom user agents.
     """
     
     BASE_URL = "https://rus.hitmotop.com"
     SEARCH_URL = f"{BASE_URL}/search"
     
     def __init__(self):
-        self.headers = {
+        # Load proxy list from environment
+        proxy_list_str = os.getenv("PROXY_LIST", "")
+        self.proxy_list = [p.strip() for p in proxy_list_str.split(",") if p.strip()]
+        
+        # Default headers (fallback)
+        self.default_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': self.BASE_URL,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
         }
+    
+    def _get_random_proxy(self) -> Optional[str]:
+        """Get random proxy from the list"""
+        if not self.proxy_list:
+            return None
+        return random.choice(self.proxy_list)
+    
+    def _prepare_headers(self, user_agent: Optional[str] = None) -> dict:
+        """Prepare headers with custom user agent if provided"""
+        headers = self.default_headers.copy()
+        if user_agent:
+            headers['User-Agent'] = user_agent
+        return headers
         
-    async def search(self, query: str, limit: int = 20, page: int = 1) -> List[Dict]:
+    async def search(self, query: str, limit: int = 20, page: int = 1, user_agent: Optional[str] = None) -> List[Dict]:
         """
         Search for tracks (Async)
+        
+        Args:
+            query: Search query
+            limit: Number of results
+            page: Page number
+            user_agent: Custom user agent from real user (optional)
         """
         try:
             params = {
@@ -32,7 +59,18 @@ class HitmoParser:
                 'start': (page - 1) * limit # Use limit for offset calculation
             }
             
-            async with httpx.AsyncClient(headers=self.headers, timeout=10.0) as client:
+            # Prepare headers with custom user agent
+            headers = self._prepare_headers(user_agent)
+            
+            # Get random proxy if available
+            proxy = self._get_random_proxy()
+            proxies = {"http://": proxy, "https://": proxy} if proxy else None
+            
+            async with httpx.AsyncClient(
+                headers=headers, 
+                timeout=10.0,
+                proxies=proxies
+            ) as client:
                 response = await client.get(self.SEARCH_URL, params=params)
                 response.raise_for_status()
                 

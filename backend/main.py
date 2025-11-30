@@ -424,95 +424,6 @@ async def get_transactions(
         total=total
     )
 
-# --- Promo Code Endpoints ---
-
-@app.get("/api/admin/promocodes", response_model=List[PromoCodeResponse])
-async def get_promocodes(user_id: int = Query(...), db: Session = Depends(get_db)):
-    """Список промокодов"""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Access denied")
-        
-    promos = db.query(PromoCode).order_by(PromoCode.created_at.desc()).all()
-    return promos
-
-@app.post("/api/admin/promocodes")
-async def create_promocode(
-    promo: PromoCodeCreate,
-    user_id: int = Query(...),
-    db: Session = Depends(get_db)
-):
-    """Создание промокода"""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Access denied")
-        
-    # Check if exists
-    existing = db.query(PromoCode).filter(PromoCode.code == promo.code).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Promo code already exists")
-        
-    new_promo = PromoCode(
-        code=promo.code,
-        discount_type=promo.discount_type,
-        value=promo.value,
-        tribute_link_month=promo.tribute_link_month,
-        tribute_link_year=promo.tribute_link_year,
-        max_uses=promo.max_uses,
-        expires_at=promo.expires_at
-    )
-    db.add(new_promo)
-    db.commit()
-    return {"status": "ok", "message": "Promo code created"}
-
-@app.delete("/api/admin/promocodes/{promo_id}")
-async def delete_promocode(
-    promo_id: int,
-    user_id: int = Query(...),
-    db: Session = Depends(get_db)
-):
-    """Удаление промокода"""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Access denied")
-        
-    promo = db.query(PromoCode).filter(PromoCode.id == promo_id).first()
-    if not promo:
-        raise HTTPException(status_code=404, detail="Promo code not found")
-        
-    db.delete(promo)
-    db.commit()
-    return {"status": "ok", "message": "Promo code deleted"}
-
-@app.post("/api/payment/check-promo", response_model=PromoCodeCheckResponse)
-async def check_promo_code(
-    payload: PromoCodeCheck,
-    db: Session = Depends(get_db)
-):
-    """Проверка промокода пользователем"""
-    code = payload.code.strip()
-    promo = db.query(PromoCode).filter(PromoCode.code == code).first()
-    
-    if not promo:
-        return {"valid": False, "message": "Промокод не найден"}
-        
-    # Check expiration
-    if promo.expires_at and promo.expires_at < datetime.utcnow():
-        return {"valid": False, "message": "Срок действия промокода истек"}
-        
-    # Check usage limit
-    if promo.max_uses > 0 and promo.used_count >= promo.max_uses:
-        return {"valid": False, "message": "Лимит использования исчерпан"}
-        
-    return {
-        "valid": True,
-        "message": "Промокод применен!",
-        "discount_type": promo.discount_type,
-        "value": promo.value,
-        "tribute_link_month": promo.tribute_link_month,
-        "tribute_link_year": promo.tribute_link_year
-    }
-
 # --- Admin Phase 2 Endpoints ---
 
 @app.post("/api/admin/broadcast")
@@ -1262,14 +1173,29 @@ async def stream_audio(request: Request, url: str = Query(..., description="URL 
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
     
-    # Timeout configuration:
-    # connect=10.0: wait max 10s to establish connection
-    # read=None: wait indefinitely for data (important for streaming large files on slow connections)
-    timeout = httpx.Timeout(10.0, read=None)
-    client = httpx.AsyncClient(follow_redirects=True, timeout=timeout)
+    # Load proxies
+    import os
+    import random
+    proxy_list_str = os.getenv("PROXY_LIST", "")
+    proxy_list = [p.strip() for p in proxy_list_str.split(",") if p.strip()]
+    
+    proxies = None
+    if proxy_list:
+        proxy = random.choice(proxy_list)
+        proxies = {"http://": proxy, "https://": proxy}
+        print(f"Using proxy for stream: {proxy}")
+    
+    # Timeout configuration
+    timeout = httpx.Timeout(15.0, read=None)
+    client = httpx.AsyncClient(follow_redirects=True, timeout=timeout, proxies=proxies)
+    
+    # Forward User-Agent from request or use default
+    user_agent = request.headers.get('user-agent')
+    if not user_agent:
+        user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'User-Agent': user_agent,
         'Accept': '*/*',
         'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
     }
@@ -1289,6 +1215,14 @@ async def stream_audio(request: Request, url: str = Query(..., description="URL 
         req = client.build_request("GET", url, headers=headers)
         r = await client.send(req, stream=True)
         
+        if r.status_code >= 400:
+            print(f"Stream error status: {r.status_code} for {url}")
+            await client.aclose()
+            # If 403/429, it might be blocking.
+            if r.status_code in [403, 429]:
+                 raise HTTPException(status_code=503, detail="Source blocked request")
+            raise HTTPException(status_code=r.status_code, detail="Upstream error")
+
         response_headers = {
             "Accept-Ranges": "bytes",
         }
@@ -1297,6 +1231,8 @@ async def stream_audio(request: Request, url: str = Query(..., description="URL 
             response_headers["Content-Length"] = r.headers["content-length"]
         if "content-range" in r.headers:
             response_headers["Content-Range"] = r.headers["content-range"]
+        if "content-type" in r.headers:
+            response_headers["Content-Type"] = r.headers["content-type"]
             
         return StreamingResponse(
             r.aiter_bytes(),
@@ -1305,10 +1241,12 @@ async def stream_audio(request: Request, url: str = Query(..., description="URL 
             media_type=r.headers.get("content-type"),
             background=BackgroundTask(close_client)
         )
+    except HTTPException:
+        raise
     except Exception as e:
         await client.aclose()
-        print(f"Error streaming audio: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error streaming audio: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"Stream error: {str(e)}")
 
 # --- Download to Chat Endpoints ---
 
