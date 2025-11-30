@@ -67,7 +67,8 @@ export enum ViewState {
   RADIO = 'radio',
   LIBRARY = 'library',
   PLAYLIST_DETAILS = 'PLAYLIST_DETAILS',
-  ADMIN = 'admin'
+  ADMIN = 'admin',
+  REFERRAL = 'referral'
 }
 
 export type RepeatMode = 'none' | 'all' | 'one';

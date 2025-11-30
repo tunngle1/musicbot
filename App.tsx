@@ -11,7 +11,9 @@ import FavoritesView from './views/FavoritesView';
 import RadioView from './views/RadioView';
 import LibraryView from './views/LibraryView';
 import AdminView from './views/AdminView';
+import ReferralView from './views/ReferralView';
 import { initTelegramWebApp } from './utils/telegram';
+import { API_BASE_URL } from './constants';
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.HOME);
@@ -31,6 +33,32 @@ const AppContent: React.FC = () => {
   // Инициализация Telegram WebApp
   useEffect(() => {
     initTelegramWebApp();
+
+    // Handle referral registration from start parameter
+    const handleReferral = async () => {
+      if (!user) return;
+
+      const initData = window.Telegram?.WebApp?.initDataUnsafe;
+      const startParam = initData?.start_param;
+
+      if (startParam && startParam.startsWith('REF')) {
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/api/referral/register?user_id=${user.id}&referral_code=${startParam}`,
+            { method: 'POST' }
+          );
+
+          if (response.ok) {
+            console.log('✅ Referral registered successfully');
+            // Optionally show notification to user
+          }
+        } catch (error) {
+          console.error('Failed to register referral:', error);
+        }
+      }
+    };
+
+    handleReferral();
 
     // Request persistent storage to prevent automatic cleanup
     const requestPersistentStorage = async () => {
@@ -73,7 +101,7 @@ const AppContent: React.FC = () => {
     };
 
     requestPersistentStorage();
-  }, []);
+  }, [user]);
 
   // Prevent background scroll when player is open
   useEffect(() => {
@@ -143,6 +171,8 @@ const AppContent: React.FC = () => {
         return <LibraryView />;
       case ViewState.ADMIN:
         return <AdminView onBack={() => setCurrentView(ViewState.HOME)} />;
+      case ViewState.REFERRAL:
+        return <ReferralView onBack={() => setCurrentView(ViewState.HOME)} />;
       default:
         return <HomeView />;
     }
