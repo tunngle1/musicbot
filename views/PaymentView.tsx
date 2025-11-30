@@ -87,27 +87,32 @@ const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
             }
             const config = await configResponse.json();
 
-            // Используем @ton/core для правильной обработки адреса
-            let walletAddress: string;
-            try {
-                const { Address } = await import('@ton/core');
+            // TonConnect SDK требует адрес в raw формате: "0:hex"
+            // Конвертируем UQ/EQ адрес в raw формат
+            let walletAddress = config.ton_wallet_address;
 
-                // Парсим адрес из любого формата
-                const addr = Address.parse(config.ton_wallet_address);
+            // Если адрес начинается с UQ или EQ, конвертируем в raw формат
+            if (walletAddress.startsWith('UQ') || walletAddress.startsWith('EQ')) {
+                try {
+                    // Убираем префикс и декодируем base64
+                    const base64 = walletAddress.substring(2);
+                    const bytes = Uint8Array.from(atob(base64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 
-                // Конвертируем в user-friendly non-bounceable формат
-                walletAddress = addr.toString({
-                    bounceable: false,
-                    urlSafe: true
-                });
+                    // Первый байт - workchain, остальные 32 байта - адрес
+                    const workchain = bytes[0];
+                    const hash = Array.from(bytes.slice(1, 33))
+                        .map(b => b.toString(16).padStart(2, '0'))
+                        .join('');
 
-                console.log('Original address:', config.ton_wallet_address);
-                console.log('Parsed address:', walletAddress);
-            } catch (e) {
-                console.error('Address parsing error:', e);
-                // Fallback - используем адрес как есть
-                walletAddress = config.ton_wallet_address;
+                    walletAddress = `${workchain}:${hash}`;
+                    console.log('Converted to raw format:', walletAddress);
+                } catch (e) {
+                    console.error('Address conversion error:', e);
+                    // Используем как есть
+                }
             }
+
+            console.log('Using wallet address:', walletAddress);
 
             // Сумма в нано-тонах (1 TON = 1,000,000,000 nanotons)
             const amountNano = (selectedPlan.priceTon * 1000000000).toString();
