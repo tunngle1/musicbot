@@ -15,6 +15,7 @@ interface PlayerContextType {
   repeatMode: RepeatMode;
   queue: Track[];
   downloadedTracks: Set<string>;
+  downloadProgress: Map<string, number>;
   isDownloading: string | null;
   isShuffle: boolean;
 
@@ -82,6 +83,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isRadioMode, setIsRadioMode] = useState(false);
   const [queue, setQueue] = useState<Track[]>(MOCK_TRACKS);
   const [downloadedTracks, setDownloadedTracks] = useState<Set<string>>(new Set());
+  const [downloadProgress, setDownloadProgress] = useState<Map<string, number>>(new Map());
   const [user, setUser] = useState<User | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -797,14 +799,41 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const processDownload = async (track: Track) => {
     try {
       setIsDownloading(track.id);
+
+      // Set initial progress to 0
+      setDownloadProgress(prev => new Map(prev).set(track.id, 0));
+
       console.log("Downloading track:", track.title);
 
-      // 1. Скачиваем аудио
+      // 1. Скачиваем аудио с отслеживанием прогресса
       const audioResponse = await fetch(track.audioUrl);
       if (!audioResponse.ok) throw new Error('Audio download failed');
-      const audioBlob = await audioResponse.blob();
 
-      // 2. Скачиваем обложку (если есть)
+      const contentLength = audioResponse.headers.get('content-length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+
+      let loaded = 0;
+      const reader = audioResponse.body?.getReader();
+      const chunks: Uint8Array[] = [];
+
+      if (reader && total > 0) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          chunks.push(value);
+          loaded += value.length;
+
+          // Update progress (0-90% for audio download)
+          const progress = Math.min(90, (loaded / total) * 90);
+          setDownloadProgress(prev => new Map(prev).set(track.id, progress));
+        }
+      }
+
+      const audioBlob = new Blob(chunks, { type: audioResponse.headers.get('content-type') || 'audio/mpeg' });
+
+      // 2. Скачиваем обложку (если есть) - 90-95%
+      setDownloadProgress(prev => new Map(prev).set(track.id, 90));
       let coverBlob: Blob | undefined;
       if (track.coverUrl && !track.coverUrl.includes('ui-avatars.com')) {
         try {
@@ -817,13 +846,31 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
       }
 
-      // 3. Сохраняем всё в базу
+      // 3. Сохраняем всё в базу - 95-100%
+      setDownloadProgress(prev => new Map(prev).set(track.id, 95));
       await storage.saveTrack(track, audioBlob, coverBlob);
 
-      setDownloadedTracks(prev => new Set(prev).add(track.id));
+      // 4. Mark as complete
+      setDownloadProgress(prev => new Map(prev).set(track.id, 100));
+
+      // Remove from progress map after a short delay
+      setTimeout(() => {
+        setDownloadProgress(prev => {
+          const next = new Map(prev);
+          next.delete(track.id);
+          return next;
+        });
+      }, 1000);
+
       setDownloadQueue(prev => prev.slice(1));
     } catch (e) {
       console.error("Download failed:", e);
+      // Remove from progress on error
+      setDownloadProgress(prev => {
+        const next = new Map(prev);
+        next.delete(track.id);
+        return next;
+      });
       setDownloadQueue(prev => prev.slice(1));
     } finally {
       setIsDownloading(null);
@@ -842,6 +889,9 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const downloadTrack = async (track: Track) => {
     // Check if already downloaded
     if (downloadedTracks.has(track.id)) return;
+
+    // Immediately add to downloaded tracks (will show with 0% progress)
+    setDownloadedTracks(prev => new Set(prev).add(track.id));
 
     // Check if already in queue
     setDownloadQueue(prev => {
@@ -880,6 +930,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       repeatMode,
       queue,
       downloadedTracks,
+      downloadProgress,
       isDownloading,
       isShuffle,
       playTrack,

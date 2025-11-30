@@ -90,6 +90,12 @@ declare global {
         Telegram?: {
             WebApp: TelegramWebApp;
         };
+        visualViewport?: {
+            height: number;
+            width: number;
+            addEventListener: (type: string, listener: EventListener) => void;
+            removeEventListener: (type: string, listener: EventListener) => void;
+        };
     }
 }
 
@@ -109,6 +115,7 @@ export const getTelegramWebApp = (): TelegramWebApp | null => {
 export const isTelegramWebApp = (): boolean => {
     return getTelegramWebApp() !== null;
 };
+
 /**
  * Инициализация Viewport (высоты экрана)
  */
@@ -124,25 +131,38 @@ export const initViewport = () => {
 
             document.documentElement.style.setProperty('--tg-viewport-height', `${height}px`);
             document.documentElement.style.setProperty('--tg-viewport-stable-height', `${stableHeight}px`);
-
-            // Detect keyboard
-            // If viewport is significantly smaller than stable height, keyboard is likely open
-            if (stableHeight - height > 100) {
-                document.documentElement.classList.add('keyboard-open');
-            } else {
-                document.documentElement.classList.remove('keyboard-open');
-            }
         } else {
             // Fallback для обычного браузера
             document.documentElement.style.setProperty('--tg-viewport-height', `${window.innerHeight}px`);
             document.documentElement.style.setProperty('--tg-viewport-stable-height', `${window.innerHeight}px`);
+        }
+    };
+
+    // Keyboard detection using Visual Viewport API (more reliable for mobile)
+    const onVisualViewportResize = () => {
+        if (!window.visualViewport) return;
+
+        const height = window.visualViewport.height;
+        const webApp = getTelegramWebApp();
+        const stableHeight = webApp?.viewportStableHeight || window.innerHeight;
+
+        console.log('Visual Viewport resize:', { height, stableHeight, diff: stableHeight - height });
+
+        // If visual viewport is significantly smaller than stable height, keyboard is open
+        if (stableHeight - height > 100) {
+            console.log('✅ Keyboard detected as OPEN');
+            document.documentElement.classList.add('keyboard-open');
+        } else {
+            console.log('✅ Keyboard detected as CLOSED');
             document.documentElement.classList.remove('keyboard-open');
         }
     };
 
+    // Fallback focus detection
     const onFocus = (e: FocusEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+            console.log('✅ Input focused, marking keyboard as open');
             document.documentElement.classList.add('keyboard-open');
         }
     };
@@ -152,11 +172,17 @@ export const initViewport = () => {
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
             setTimeout(() => {
                 if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
-                    const webApp = getTelegramWebApp();
-                    const height = webApp?.viewportHeight || window.innerHeight;
-                    const stableHeight = webApp?.viewportStableHeight || height;
-
-                    if (stableHeight - height < 100) {
+                    // Double check with visual viewport if available
+                    if (window.visualViewport) {
+                        const height = window.visualViewport.height;
+                        const webApp = getTelegramWebApp();
+                        const stableHeight = webApp?.viewportStableHeight || window.innerHeight;
+                        if (stableHeight - height < 100) {
+                            console.log('✅ Input blurred, marking keyboard as closed');
+                            document.documentElement.classList.remove('keyboard-open');
+                        }
+                    } else {
+                        console.log('✅ Input blurred, marking keyboard as closed (no visualViewport)');
                         document.documentElement.classList.remove('keyboard-open');
                     }
                 }
@@ -174,6 +200,15 @@ export const initViewport = () => {
 
     // Слушаем обычный resize
     window.addEventListener('resize', setViewportHeight);
+
+    // Listen for visual viewport resize (most reliable for keyboard detection)
+    if (window.visualViewport) {
+        console.log('✅ Visual Viewport API available');
+        window.visualViewport.addEventListener('resize', onVisualViewportResize as any);
+    } else {
+        console.warn('⚠️ Visual Viewport API not available');
+    }
+
     window.addEventListener('focus', onFocus, true);
     window.addEventListener('blur', onBlur, true);
 
@@ -182,6 +217,11 @@ export const initViewport = () => {
             webApp.offEvent('viewportChanged', setViewportHeight);
         }
         window.removeEventListener('resize', setViewportHeight);
+
+        if (window.visualViewport) {
+            window.visualViewport.removeEventListener('resize', onVisualViewportResize as any);
+        }
+
         window.removeEventListener('focus', onFocus, true);
         window.removeEventListener('blur', onBlur, true);
     };

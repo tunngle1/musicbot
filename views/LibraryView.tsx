@@ -4,9 +4,10 @@ import { usePlayer } from '../context/PlayerContext';
 import { Track } from '../types';
 import { storage } from '../utils/storage';
 import { API_BASE_URL } from '../constants';
+import CircularProgress from '../components/CircularProgress';
 
 const LibraryView: React.FC = () => {
-  const { addTrack, playTrack, currentTrack, isPlaying, removeDownloadedTrack, togglePlay, markTrackAsDownloaded } = usePlayer();
+  const { addTrack, playTrack, currentTrack, isPlaying, removeDownloadedTrack, togglePlay, markTrackAsDownloaded, downloadProgress } = usePlayer();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [libraryTracks, setLibraryTracks] = useState<Track[]>([]);
   const [storageInfo, setStorageInfo] = useState<{
@@ -310,6 +311,9 @@ const LibraryView: React.FC = () => {
           <div className="space-y-2">
             {libraryTracks.map(track => {
               const isCurrent = currentTrack?.id === track.id;
+              const progress = downloadProgress.get(track.id);
+              const isDownloading = progress !== undefined && progress < 100;
+
               return (
                 <div
                   key={track.id}
@@ -350,12 +354,18 @@ const LibraryView: React.FC = () => {
                     <p className="text-xs text-gray-400 truncate">{track.artist}</p>
                   </div>
 
-                  <button
-                    onClick={(e) => handleDelete(e, track.id)}
-                    className="p-2 text-gray-500 hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                  {isDownloading ? (
+                    <div className="ml-2">
+                      <CircularProgress progress={progress} size={36} />
+                    </div>
+                  ) : (
+                    <button
+                      onClick={(e) => handleDelete(e, track.id)}
+                      className="p-2 text-gray-500 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  )}
                 </div>
               )
             })}
