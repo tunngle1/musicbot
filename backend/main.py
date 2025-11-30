@@ -923,6 +923,7 @@ async def reset_admin_cache(admin_id: int = Query(...), db: Session = Depends(ge
 
 @app.get("/api/search", response_model=SearchResponse)
 async def search_tracks(
+    request: Request,
     q: str = Query(..., description="Поисковый запрос", min_length=1),
     limit: int = Query(20, description="Максимальное количество результатов", ge=1, le=50),
     page: int = Query(1, description="Номер страницы", ge=1),
@@ -933,6 +934,9 @@ async def search_tracks(
     Поиск треков по запросу (с кэшированием)
     """
     try:
+        # Get user agent
+        user_agent = request.headers.get('user-agent')
+        
         # 1. Проверяем кэш
         cache_key = make_cache_key("search", {
             "q": q, 
@@ -963,7 +967,7 @@ async def search_tracks(
             for p in range(1, 4):
                 try:
                     print(f"DEBUG: Fetching page {p}...")
-                    page_tracks = await parser.search(q, limit=48, page=p)
+                    page_tracks = await parser.search(q, limit=48, page=p, user_agent=user_agent)
                     all_tracks.extend(page_tracks)
                     if len(page_tracks) < 20: # Если вернулось мало треков, значит страницы кончились
                         break
@@ -975,7 +979,7 @@ async def search_tracks(
             tracks = all_tracks
         else:
             # Обычный поиск - одна страница
-            tracks = await parser.search(q, limit=limit, page=page)
+            tracks = await parser.search(q, limit=limit, page=page, user_agent=user_agent)
             print(f"DEBUG: Search query='{q}', limit={limit}, page={page}. Found {len(tracks)} tracks before filtering.")
         
         # Фильтрация по артисту или треку если запрошено
@@ -1096,6 +1100,7 @@ async def get_radio_stations():
 
 @app.get("/api/genre/{genre_id}")
 async def get_genre_tracks(
+    request: Request,
     genre_id: int,
     limit: int = Query(20, description="Максимальное количество результатов", ge=1, le=50),
     page: int = Query(1, description="Номер страницы", ge=1)
@@ -1121,7 +1126,8 @@ async def get_genre_tracks(
             }
 
         # 2. Запрос
-        tracks = await parser.get_genre_tracks(genre_id, limit=limit, page=page)
+        user_agent = request.headers.get('user-agent')
+        tracks = await parser.get_genre_tracks(genre_id, limit=limit, page=page, user_agent=user_agent)
         
         track_models = []
         base_url = ""

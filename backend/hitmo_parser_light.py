@@ -186,7 +186,7 @@ class HitmoParser:
         except:
             return None
     
-    async def get_genre_tracks(self, genre_id: int, limit: int = 20, page: int = 1) -> List[Dict]:
+    async def get_genre_tracks(self, genre_id: int, limit: int = 20, page: int = 1, user_agent: Optional[str] = None) -> List[Dict]:
         """
         Get tracks from a specific genre (Async)
         """
@@ -196,7 +196,19 @@ class HitmoParser:
                 'start': (page - 1) * limit
             }
             
-            async with httpx.AsyncClient(headers=self.headers, timeout=10.0, follow_redirects=True) as client:
+            # Prepare headers with custom user agent
+            headers = self._prepare_headers(user_agent)
+            
+            # Get random proxy if available
+            proxy = self._get_random_proxy()
+            proxies = {"http://": proxy, "https://": proxy} if proxy else None
+            
+            async with httpx.AsyncClient(
+                headers=headers, 
+                timeout=10.0, 
+                follow_redirects=True,
+                proxies=proxies
+            ) as client:
                 response = await client.get(url, params=params)
                 response.raise_for_status()
                 
