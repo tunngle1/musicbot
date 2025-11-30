@@ -63,11 +63,16 @@ export const searchTracks = async (
                 audioUrl = `${API_BASE_URL}${audioUrl}`;
             }
 
+            let coverUrl = (track as any).image;
+            if (coverUrl && coverUrl.startsWith('/')) {
+                coverUrl = `${API_BASE_URL}${coverUrl}`;
+            }
+
             return {
                 id: track.id,
                 title: track.title,
                 artist: track.artist,
-                coverUrl: (track as any).image,
+                coverUrl: coverUrl,
                 audioUrl: audioUrl,
                 duration: track.duration,
                 isLocal: false
@@ -112,11 +117,16 @@ export const getGenreTracks = async (
                 audioUrl = `${API_BASE_URL}${audioUrl}`;
             }
 
+            let coverUrl = (track as any).image;
+            if (coverUrl && coverUrl.startsWith('/')) {
+                coverUrl = `${API_BASE_URL}${coverUrl}`;
+            }
+
             return {
                 id: track.id,
                 title: track.title,
                 artist: track.artist,
-                coverUrl: (track as any).image,
+                coverUrl: coverUrl,
                 audioUrl: audioUrl,
                 duration: track.duration,
                 isLocal: false
@@ -151,11 +161,16 @@ export const getTrack = async (trackId: string): Promise<Track> => {
             audioUrl = `${API_BASE_URL}${audioUrl}`;
         }
 
+        let coverUrl = (track as any).image;
+        if (coverUrl && coverUrl.startsWith('/')) {
+            coverUrl = `${API_BASE_URL}${coverUrl}`;
+        }
+
         return {
             id: track.id,
             title: track.title,
             artist: track.artist,
-            coverUrl: (track as any).image,
+            coverUrl: coverUrl,
             audioUrl: audioUrl,
             duration: track.duration,
             isLocal: false
