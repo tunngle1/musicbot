@@ -7,7 +7,7 @@ import { API_BASE_URL } from '../constants';
 import CircularProgress from '../components/CircularProgress';
 
 const LibraryView: React.FC = () => {
-  const { addTrack, playTrack, currentTrack, isPlaying, removeDownloadedTrack, togglePlay, downloadProgress, downloadTrack, downloadedTracks } = usePlayer();
+  const { addTrack, playTrack, currentTrack, isPlaying, removeDownloadedTrack, togglePlay, downloadProgress, downloadTrack, downloadedTracks, downloadQueue } = usePlayer();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [libraryTracks, setLibraryTracks] = useState<Track[]>([]);
   const [storageInfo, setStorageInfo] = useState<{
@@ -88,16 +88,36 @@ const LibraryView: React.FC = () => {
     loadStorageInfo();
   }, []);
 
-  // Sync library tracks with downloadedTracks from context
+  // Sync library tracks with downloadedTracks and downloadQueue from context
   useEffect(() => {
     loadLibraryTracks();
-  }, [downloadedTracks]);
+  }, [downloadedTracks, downloadQueue]);
 
   const loadLibraryTracks = async () => {
-    const tracks = await storage.getAllTracks();
-    // Filter only downloaded tracks (isLocal = true) and sort by newest
-    const downloadedTracksList = tracks.filter(t => t.isLocal);
-    setLibraryTracks(downloadedTracksList.reverse());
+    const storedTracks = await storage.getAllTracks();
+    // Filter only downloaded tracks (isLocal = true)
+    const storedDownloadedTracks = storedTracks.filter(t => t.isLocal);
+
+    // Merge with downloadQueue
+    // Create a map by ID to avoid duplicates
+    const allTracksMap = new Map<string, Track>();
+
+    // First add stored tracks
+    storedDownloadedTracks.forEach(track => {
+      allTracksMap.set(track.id, track);
+    });
+
+    // Then add queue tracks if not present
+    if (downloadQueue && Array.isArray(downloadQueue)) {
+      downloadQueue.forEach(track => {
+        if (!allTracksMap.has(track.id)) {
+          allTracksMap.set(track.id, track);
+        }
+      });
+    }
+
+    const combinedTracks = Array.from(allTracksMap.values());
+    setLibraryTracks(combinedTracks.reverse());
   };
 
   const loadStorageInfo = async () => {

@@ -18,6 +18,7 @@ interface PlayerContextType {
   downloadProgress: Map<string, number>;
   isDownloading: string | null;
   isShuffle: boolean;
+  downloadQueue: Track[];
 
   // Действия
   playTrack: (track: Track, newQueue?: Track[]) => void;
@@ -784,7 +785,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const [downloadQueue, setDownloadQueue] = useState<Track[]>([]);
+  const [downloadQueueState, setDownloadQueue] = useState<Track[]>([]);
 
   const toggleRepeat = () => {
     setRepeatMode(prev => {
@@ -932,6 +933,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       downloadedTracks,
       downloadProgress,
       isDownloading,
+      downloadQueue: downloadQueueState,
       isShuffle,
       playTrack,
       playRadio,
