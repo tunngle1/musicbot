@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { User, SubscriptionPlan } from '../types';
-import { Loader, Check, Star, Zap } from 'lucide-react';
+import { Loader, Check, Star, Zap, CreditCard } from 'lucide-react';
 import { API_BASE_URL } from '../constants';
-import { useTonConnectUI, TonConnectButton } from '@tonconnect/ui-react';
 
 // Планы подписки
 const PLANS: SubscriptionPlan[] = [
@@ -32,7 +31,6 @@ interface PaymentViewProps {
 const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
     const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>(PLANS[0]);
     const [isLoading, setIsLoading] = useState(false);
-    const [tonConnectUI] = useTonConnectUI();
 
     const handleStarsPayment = async () => {
         setIsLoading(true);
@@ -72,12 +70,7 @@ const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
         }
     };
 
-    const handleTonPayment = async () => {
-        if (!tonConnectUI.connected) {
-            window.Telegram.WebApp.showAlert('Пожалуйста, подключите кошелек TON');
-            return;
-        }
-
+    const handleTributePayment = async () => {
         setIsLoading(true);
         try {
             // Получаем конфигурацию платежей с бэкенда
@@ -87,79 +80,20 @@ const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
             }
             const config = await configResponse.json();
 
-            // TonConnect SDK требует адрес в raw формате: "0:hex"
-            // Конвертируем UQ/EQ адрес в raw формат
-            let walletAddress = config.ton_wallet_address;
+            // Выбираем ссылку в зависимости от плана
+            const link = selectedPlan.id === 'month' ? config.tribute_link_month : config.tribute_link_year;
 
-            // Если адрес начинается с UQ или EQ, конвертируем в raw формат
-            if (walletAddress.startsWith('UQ') || walletAddress.startsWith('EQ')) {
-                try {
-                    // Убираем префикс и декодируем base64
-                    const base64 = walletAddress.substring(2);
-                    const bytes = Uint8Array.from(atob(base64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-
-                    // Первый байт - workchain, остальные 32 байта - адрес
-                    const workchain = bytes[0];
-                    const hash = Array.from(bytes.slice(1, 33))
-                        .map(b => b.toString(16).padStart(2, '0'))
-                        .join('');
-
-                    walletAddress = `${workchain}:${hash}`;
-                    console.log('Converted to raw format:', walletAddress);
-                } catch (e) {
-                    console.error('Address conversion error:', e);
-                    // Используем как есть
-                }
-            }
-
-            console.log('Using wallet address:', walletAddress);
-
-            // Сумма в нано-тонах (1 TON = 1,000,000,000 nanotons)
-            const amountNano = (selectedPlan.priceTon * 1000000000).toString();
-
-            const transaction = {
-                validUntil: Math.floor(Date.now() / 1000) + 600, // 10 минут
-                messages: [
-                    {
-                        address: walletAddress,
-                        amount: amountNano,
-                        // payload: ... (можно добавить комментарий с ID пользователя)
-                    }
-                ]
-            };
-
-            console.log('Sending transaction:', transaction);
-
-            const result = await tonConnectUI.sendTransaction(transaction);
-
-            console.log('Transaction sent, BOC:', result.boc);
-
-            // Отправляем BOC на бэкенд для проверки
-            const response = await fetch(`${API_BASE_URL}/api/payment/ton/verify`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: user?.id,
-                    plan: selectedPlan.id,
-                    boc: result.boc
-                })
-            });
-
-            const data = await response.json();
-            if (data.status === 'ok') {
-                window.Telegram.WebApp.showAlert('Оплата TON успешна! Премиум активирован.');
-                onClose();
+            if (link) {
+                // Открываем Tribute Mini App
+                (window.Telegram.WebApp as any).openTelegramLink(link);
+                onClose(); // Закрываем окно оплаты, так как пользователь перейдет в Tribute
             } else {
-                window.Telegram.WebApp.showAlert('Ошибка проверки транзакции.');
+                window.Telegram.WebApp.showAlert('Ссылка на оплату не настроена. Пожалуйста, свяжитесь с поддержкой.');
             }
 
         } catch (error) {
-            console.error('TON Payment error:', error);
-            if (error instanceof Error && error.message.includes('User rejected')) {
-                // User cancelled
-            } else {
-                window.Telegram.WebApp.showAlert('Ошибка при оплате TON: ' + (error as Error).message);
-            }
+            console.error('Tribute Payment error:', error);
+            window.Telegram.WebApp.showAlert('Ошибка при получении ссылки на оплату.');
         } finally {
             setIsLoading(false);
         }
@@ -236,27 +170,18 @@ const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
                             <div className="w-full border-t border-gray-700"></div>
                         </div>
                         <div className="relative flex justify-center">
-                            <span className="px-2 bg-[#1c1c1e] text-sm text-gray-500">или через TON</span>
+                            <span className="px-2 bg-[#1c1c1e] text-sm text-gray-500">или через TON / Карту</span>
                         </div>
                     </div>
 
                     <div className="flex flex-col gap-2">
-                        <div className="flex justify-center w-full">
-                            <TonConnectButton />
-                        </div>
-
                         <button
-                            onClick={handleTonPayment}
-                            disabled={isLoading || !tonConnectUI.connected}
-                            className={`
-                                w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors
-                                ${!tonConnectUI.connected
-                                    ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                                    : 'bg-[#0098EA] hover:bg-[#0088D0] text-white'}
-                            `}
+                            onClick={handleTributePayment}
+                            disabled={isLoading}
+                            className="w-full py-4 bg-[#0098EA] hover:bg-[#0088D0] text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
                         >
-                            <Zap size={20} />
-                            Оплатить {selectedPlan.priceTon} TON
+                            <CreditCard size={20} />
+                            Оплатить {selectedPlan.priceTon} TON / Карта (Tribute)
                         </button>
                     </div>
 

@@ -2,7 +2,7 @@
 FastAPI Backend for Telegram Music Mini App
 """
 
-from fastapi import FastAPI, HTTPException, Query, Depends, Body, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Query, Depends, Body, BackgroundTasks, Request
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -17,12 +17,14 @@ try:
     from backend.cache import make_cache_key, get_from_cache, set_to_cache, get_cache_stats, reset_cache
     from backend.lyrics_service import LyricsService
     from backend.payments import create_stars_invoice, verify_ton_transaction, grant_premium_after_payment
+    from backend.tribute import verify_tribute_signature
 except ImportError:
     from hitmo_parser_light import HitmoParser
     from database import User, DownloadedMessage, Lyrics, get_db, init_db, SessionLocal
     from cache import make_cache_key, get_from_cache, set_to_cache, get_cache_stats, reset_cache
     from lyrics_service import LyricsService
     from payments import create_stars_invoice, verify_ton_transaction, grant_premium_after_payment
+    from tribute import verify_tribute_signature
 
 import os
 from dotenv import load_dotenv
@@ -542,7 +544,9 @@ async def get_payment_config():
     return {
         "ton_wallet_address": TON_WALLET_ADDRESS,
         "ton_price_month": TON_PRICE_MONTH,
-        "ton_price_year": TON_PRICE_YEAR
+        "ton_price_year": TON_PRICE_YEAR,
+        "tribute_link_month": os.getenv("TRIBUTE_LINK_MONTH"),
+        "tribute_link_year": os.getenv("TRIBUTE_LINK_YEAR")
     }
 
 @app.post("/api/payment/stars/create")
@@ -612,6 +616,71 @@ async def telegram_webhook(update: Dict[str, Any] = Body(...), db: Session = Dep
     except Exception as e:
         print(f"Webhook error: {e}")
         # Не возвращаем ошибку Telegram, чтобы он не слал повторы бесконечно
+        return {"status": "ok"}
+
+@app.post("/api/webhook/tribute")
+async def tribute_webhook(request: Request, db: Session = Depends(get_db)):
+    """Webhook for Tribute.tg payments"""
+    try:
+        # 1. Verify signature
+        api_key = os.getenv("TRIBUTE_API_KEY")
+        signature = request.headers.get("trbt-signature")
+        body = await request.body()
+        
+        if not verify_tribute_signature(api_key, body, signature):
+            print("Invalid Tribute signature")
+            # Return 200 to prevent retries if it's just a config issue, but log error
+            # Actually, return 401 if signature is wrong so we know
+            # But for stability, let's just log and return 200 if we are unsure
+            # Better to raise 401 to see it in logs
+            raise HTTPException(status_code=401, detail="Invalid signature")
+            
+        # 2. Parse payload
+        payload = await request.json()
+        event_type = payload.get("name")
+        data = payload.get("payload", {})
+        
+        print(f"Tribute Webhook: {event_type}")
+        
+        # 3. Handle successful payment
+        if event_type in ["order_paid", "subscription_active", "payment_succeeded"]:
+            # Extract user ID
+            telegram_id = None
+            if "customer" in data:
+                telegram_id = data["customer"].get("telegram_id")
+            
+            if telegram_id:
+                # Determine plan based on amount or product
+                # 1 TON ~ 1 Month, 10 TON ~ 1 Year
+                # Or check product IDs if we configured them
+                amount = data.get("amount", {}).get("value", 0)
+                currency = data.get("amount", {}).get("currency", "TON")
+                
+                plan = "month"
+                # Simple logic: if amount > 5 TON, it's a year
+                if float(amount) > 5:
+                    plan = "year"
+                
+                print(f"Processing payment for user {telegram_id}, amount {amount} {currency}, plan {plan}")
+                
+                # Grant premium
+                # Note: telegram_id in Tribute is the user's Telegram ID
+                # We need to ensure we have this user in our DB
+                # Our User.id IS the telegram_id
+                
+                success = grant_premium_after_payment(db, int(telegram_id), plan, "tribute", float(amount))
+                if success:
+                    print(f"Successfully granted premium to {telegram_id}")
+                else:
+                    print(f"Failed to grant premium to {telegram_id}")
+            else:
+                print("Could not find telegram_id in webhook payload")
+                    
+        return {"status": "ok"}
+        
+    except Exception as e:
+        print(f"Tribute webhook error: {e}")
+        # Return 200 to acknowledge receipt even if processing failed, to stop retries
         return {"status": "ok"}
 
 # --- Debug Endpoints (для тестирования) ---
