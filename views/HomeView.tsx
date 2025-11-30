@@ -188,46 +188,44 @@ const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
   return (
     <div className="px-4 py-8 space-y-8 animate-fade-in-up pb-24">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
             Музыка
           </h1>
           {user?.is_premium_pro && (
-            <span className="px-2 py-0.5 rounded-md bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 text-[10px] font-medium uppercase tracking-wider border border-purple-500/30 backdrop-blur-sm">
-              Premium Pro
+            <span className="px-1.5 py-0.5 rounded-md bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 text-[9px] font-medium uppercase tracking-wider border border-purple-500/30 backdrop-blur-sm">
+              Pro
             </span>
           )}
           {user?.is_premium && !user?.is_premium_pro && (
-            <span className="px-2 py-0.5 rounded-md bg-white/10 text-white/50 text-[10px] font-medium uppercase tracking-wider border border-white/5 backdrop-blur-sm">
+            <span className="px-1.5 py-0.5 rounded-md bg-white/10 text-white/50 text-[9px] font-medium uppercase tracking-wider border border-white/5 backdrop-blur-sm">
               Premium
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {user?.is_admin && (
             <button
               onClick={() => onNavigate(ViewState.ADMIN)}
-              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+              className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
             >
-              <Settings size={16} />
+              <Settings size={14} />
             </button>
           )}
 
           <button
             onClick={() => onNavigate(ViewState.REFERRAL)}
-            className="px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-600 text-white text-xs font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-1"
+            className="px-2 py-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-600 text-white text-[10px] font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-1"
           >
             🎁
-            Пригласить
           </button>
 
           <button
             onClick={() => setShowPayment(true)}
-            className="px-3 py-1.5 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-1"
+            className="px-2 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white text-[10px] font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-1"
           >
             <span className="text-yellow-300">★</span>
-            Premium
           </button>
         </div>
       </div>

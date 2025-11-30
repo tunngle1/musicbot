@@ -1682,8 +1682,8 @@ async def get_referral_code(user_id: int = Query(...), db: Session = Depends(get
         user.referral_code = f"REF{user_id}"
         db.commit()
     
-    # Get bot username from environment or use placeholder
-    bot_username = os.getenv("BOT_USERNAME", "your_bot")
+    # Use muzikavtgbot as bot username
+    bot_username = "muzikavtgbot"
     
     return {
         "code": user.referral_code,
@@ -1740,6 +1740,26 @@ async def register_referral(
     )
     db.add(referral)
     db.commit()
+    
+    # Send notification to referrer via Telegram
+    if BOT_TOKEN:
+        try:
+            import httpx
+            telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+            
+            # Get new user name
+            new_user_name = user.first_name or user.username or f"Пользователь {user.id}"
+            
+            async with httpx.AsyncClient() as client:
+                await client.post(telegram_url, json={
+                    'chat_id': referrer.id,
+                    'text': f"🎉 <b>Новый реферал!</b>\n\n"
+                            f"{new_user_name} зарегистрировался по вашей ссылке.\n"
+                            f"Когда он оформит подписку, вы получите +30 дней Premium!",
+                    'parse_mode': 'HTML'
+                })
+        except Exception as e:
+            print(f"Failed to send referral joined notification: {e}")
     
     return {
         "status": "ok",
