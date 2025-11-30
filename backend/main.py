@@ -18,6 +18,7 @@ try:
     from backend.lyrics_service import LyricsService
     from backend.payments import create_stars_invoice, verify_ton_transaction, grant_premium_after_payment
     from backend.tribute import verify_tribute_signature
+    from backend.database import User, DownloadedMessage, Lyrics, Payment, PromoCode, get_db, init_db, SessionLocal
 except ImportError:
     from hitmo_parser_light import HitmoParser
     from database import User, DownloadedMessage, Lyrics, get_db, init_db, SessionLocal
@@ -25,6 +26,7 @@ except ImportError:
     from lyrics_service import LyricsService
     from payments import create_stars_invoice, verify_ton_transaction, grant_premium_after_payment
     from tribute import verify_tribute_signature
+    from database import User, DownloadedMessage, Lyrics, Payment, PromoCode, get_db, init_db, SessionLocal
 
 import os
 from dotenv import load_dotenv
@@ -67,6 +69,51 @@ class UserStats(BaseModel):
     new_users_today: int
     total_revenue_ton: float
     total_revenue_stars: int
+    total_revenue_rub: float
+
+class Transaction(BaseModel):
+    id: int
+    user_id: int
+    amount: str
+    currency: str
+    plan: str
+    status: str
+    created_at: datetime
+
+class TransactionListResponse(BaseModel):
+    transactions: List[Transaction]
+    total: int
+
+class PromoCodeCreate(BaseModel):
+    code: str
+    discount_type: str # 'percent', 'fixed', 'trial'
+    value: int
+    tribute_link_month: Optional[str] = None
+    tribute_link_year: Optional[str] = None
+    max_uses: int = 0
+    expires_at: Optional[datetime] = None
+
+class PromoCodeResponse(BaseModel):
+    id: int
+    code: str
+    discount_type: str
+    value: int
+    used_count: int
+    max_uses: int
+    expires_at: Optional[datetime]
+    tribute_link_month: Optional[str]
+    tribute_link_year: Optional[str]
+
+class PromoCodeCheck(BaseModel):
+    code: str
+
+class PromoCodeCheckResponse(BaseModel):
+    valid: bool
+    message: str
+    discount_type: Optional[str] = None
+    value: Optional[int] = None
+    tribute_link_month: Optional[str] = None
+    tribute_link_year: Optional[str] = None
 
 class CreateInvoiceRequest(BaseModel):
     user_id: int
@@ -323,7 +370,8 @@ async def get_stats(user_id: int = Query(...), db: Session = Depends(get_db)):
     # Считаем выручку
     payments = db.query(Payment).filter(Payment.status == 'completed').all()
     ton_revenue = sum(float(p.amount) for p in payments if p.currency == 'TON')
-    stars_revenue = sum(int(p.amount) for p in payments if p.currency == 'XTR')
+    stars_revenue = sum(float(p.amount) for p in payments if p.currency == 'XTR')
+    rub_revenue = sum(float(p.amount) for p in payments if p.currency == 'RUB')
     
     return UserStats(
         total_users=total,
@@ -331,9 +379,126 @@ async def get_stats(user_id: int = Query(...), db: Session = Depends(get_db)):
         admin_users=admins,
         new_users_today=new_today,
         total_revenue_ton=ton_revenue,
-        total_revenue_stars=stars_revenue
+        total_revenue_stars=stars_revenue,
+        total_revenue_rub=rub_revenue
     )
 
+@app.get("/api/admin/transactions", response_model=TransactionListResponse)
+async def get_transactions(
+    user_id: int = Query(...), 
+    limit: int = 20, 
+    offset: int = 0, 
+    db: Session = Depends(get_db)
+):
+    """Получение истории транзакций"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    total = db.query(Payment).count()
+    payments = db.query(Payment).order_by(Payment.created_at.desc()).offset(offset).limit(limit).all()
+    
+    return TransactionListResponse(
+        transactions=[Transaction(
+            id=p.id,
+            user_id=p.user_id,
+            amount=p.amount,
+            currency=p.currency,
+            plan=p.plan,
+            status=p.status,
+            created_at=p.created_at
+        ) for p in payments],
+        total=total
+    )
+
+# --- Promo Code Endpoints ---
+
+@app.get("/api/admin/promocodes", response_model=List[PromoCodeResponse])
+async def get_promocodes(user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Список промокодов"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    promos = db.query(PromoCode).order_by(PromoCode.created_at.desc()).all()
+    return promos
+
+@app.post("/api/admin/promocodes")
+async def create_promocode(
+    promo: PromoCodeCreate,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Создание промокода"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    # Check if exists
+    existing = db.query(PromoCode).filter(PromoCode.code == promo.code).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Promo code already exists")
+        
+    new_promo = PromoCode(
+        code=promo.code,
+        discount_type=promo.discount_type,
+        value=promo.value,
+        tribute_link_month=promo.tribute_link_month,
+        tribute_link_year=promo.tribute_link_year,
+        max_uses=promo.max_uses,
+        expires_at=promo.expires_at
+    )
+    db.add(new_promo)
+    db.commit()
+    return {"status": "ok", "message": "Promo code created"}
+
+@app.delete("/api/admin/promocodes/{promo_id}")
+async def delete_promocode(
+    promo_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Удаление промокода"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    promo = db.query(PromoCode).filter(PromoCode.id == promo_id).first()
+    if not promo:
+        raise HTTPException(status_code=404, detail="Promo code not found")
+        
+    db.delete(promo)
+    db.commit()
+    return {"status": "ok", "message": "Promo code deleted"}
+
+@app.post("/api/payment/check-promo", response_model=PromoCodeCheckResponse)
+async def check_promo_code(
+    payload: PromoCodeCheck,
+    db: Session = Depends(get_db)
+):
+    """Проверка промокода пользователем"""
+    code = payload.code.strip()
+    promo = db.query(PromoCode).filter(PromoCode.code == code).first()
+    
+    if not promo:
+        return {"valid": False, "message": "Промокод не найден"}
+        
+    # Check expiration
+    if promo.expires_at and promo.expires_at < datetime.utcnow():
+        return {"valid": False, "message": "Срок действия промокода истек"}
+        
+    # Check usage limit
+    if promo.max_uses > 0 and promo.used_count >= promo.max_uses:
+        return {"valid": False, "message": "Лимит использования исчерпан"}
+        
+    return {
+        "valid": True,
+        "message": "Промокод применен!",
+        "discount_type": promo.discount_type,
+        "value": promo.value,
+        "tribute_link_month": promo.tribute_link_month,
+        "tribute_link_year": promo.tribute_link_year
+    }
 @app.get("/api/admin/users", response_model=UserListResponse)
 async def get_users(user_id: int = Query(...), filter_type: str = Query("all"), db: Session = Depends(get_db)):
     """

@@ -12,6 +12,29 @@ interface UserStats {
     new_users_today: number;
     total_revenue_ton: number;
     total_revenue_stars: number;
+    total_revenue_rub: number;
+}
+
+interface Transaction {
+    id: number;
+    user_id: number;
+    amount: string;
+    currency: string;
+    plan: string;
+    status: string;
+    created_at: string;
+}
+
+interface PromoCode {
+    id: number;
+    code: string;
+    discount_type: string;
+    value: number;
+    used_count: number;
+    max_uses: number;
+    expires_at: string | null;
+    tribute_link_month: string | null;
+    tribute_link_year: string | null;
 }
 
 interface CacheStats {
@@ -37,7 +60,7 @@ interface AdminViewProps {
     onBack: () => void;
 }
 
-type TabType = 'overview' | 'all' | 'premium' | 'admins';
+type TabType = 'overview' | 'all' | 'premium' | 'admins' | 'transactions' | 'promocodes';
 
 const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
     const { user } = usePlayer();
@@ -47,6 +70,16 @@ const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
     const [allUsers, setAllUsers] = useState<UserListItem[]>([]);
     const [premiumUsers, setPremiumUsers] = useState<UserListItem[]>([]);
     const [adminUsers, setAdminUsers] = useState<UserListItem[]>([]);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
+    const [newPromo, setNewPromo] = useState({
+        code: '',
+        discount_type: 'percent',
+        value: 0,
+        max_uses: 0,
+        tribute_link_month: '',
+        tribute_link_year: ''
+    });
     const [isLoading, setIsLoading] = useState(true);
     const [targetId, setTargetId] = useState('');
     const [grantType, setGrantType] = useState<'admin' | 'premium'>('premium');
@@ -68,7 +101,12 @@ const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
         } else if (activeTab === 'premium' && premiumUsers.length === 0) {
             loadPremiumUsers();
         } else if (activeTab === 'admins' && adminUsers.length === 0) {
+        } else if (activeTab === 'admins' && adminUsers.length === 0) {
             loadAdminUsers();
+        } else if (activeTab === 'transactions' && transactions.length === 0) {
+            loadTransactions();
+        } else if (activeTab === 'promocodes' && promoCodes.length === 0) {
+            loadPromoCodes();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab]);
@@ -137,6 +175,75 @@ const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
         } catch (error) {
             console.error('Failed to load admin users:', error);
         }
+    };
+
+    const loadTransactions = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/transactions?user_id=${user?.id}`);
+            if (response.ok) {
+                const data = await response.json();
+                setTransactions(data.transactions);
+            }
+        } catch (error) {
+            console.error('Failed to load transactions:', error);
+        }
+    };
+
+    const loadPromoCodes = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/promocodes?user_id=${user?.id}`);
+            if (response.ok) {
+                const data = await response.json();
+                setPromoCodes(data);
+            }
+        } catch (error) {
+            console.error('Failed to load promo codes:', error);
+        }
+    };
+
+    const handleCreatePromo = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/promocodes?user_id=${user?.id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newPromo)
+            });
+            if (response.ok) {
+                setMessage({ type: 'success', text: 'Промокод создан' });
+                setNewPromo({
+                    code: '',
+                    discount_type: 'percent',
+                    value: 0,
+                    max_uses: 0,
+                    tribute_link_month: '',
+                    tribute_link_year: ''
+                });
+                loadPromoCodes();
+            } else {
+                const error = await response.json();
+                setMessage({ type: 'error', text: error.detail || 'Ошибка создания' });
+            }
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Ошибка сети' });
+        }
+        setTimeout(() => setMessage(null), 3000);
+    };
+
+    const handleDeletePromo = async (id: number) => {
+        if (!confirm('Удалить промокод?')) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/promocodes/${id}?user_id=${user?.id}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                setMessage({ type: 'success', text: 'Промокод удален' });
+                loadPromoCodes();
+            }
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Ошибка удаления' });
+        }
+        setTimeout(() => setMessage(null), 3000);
     };
 
     const handleResetCache = async () => {
@@ -318,6 +425,24 @@ const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                 >
                     Админы
                 </button>
+                <button
+                    onClick={() => setActiveTab('transactions')}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === 'transactions'
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                        : 'text-white/60 hover:text-white hover:bg-white/5'
+                        }`}
+                >
+                    Транзакции
+                </button>
+                <button
+                    onClick={() => setActiveTab('promocodes')}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === 'promocodes'
+                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-white/60 hover:text-white hover:bg-white/5'
+                        }`}
+                >
+                    Промокоды
+                </button>
             </div>
 
             {/* Overview Tab */}
@@ -376,12 +501,12 @@ const AdminView: React.FC<AdminViewProps> = ({ onBack }) => {
                         </div>
 
                         <div className="glass-panel p-5 rounded-2xl">
-                            <div className="flex items-center gap-2 text-yellow-400 mb-2">
-                                <Star size={16} />
-                                <span className="text-xs font-bold uppercase tracking-wider">Stars Revenue</span>
+                            <div className="flex items-center gap-2 text-green-400 mb-2">
+                                <Zap size={16} />
+                                <span className="text-xs font-bold uppercase tracking-wider">RUB Revenue</span>
                             </div>
                             <div className="text-3xl font-bold text-white text-glow">
-                                {isLoading ? '...' : stats?.total_revenue_stars}
+                                {isLoading ? '...' : stats?.total_revenue_rub.toFixed(0)} ₽
                             </div>
                         </div>
                     </div>

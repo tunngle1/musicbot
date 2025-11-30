@@ -69,6 +69,20 @@ class Payment(Base):
     transaction_hash = Column(String, nullable=True) # For TON
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class PromoCode(Base):
+    __tablename__ = "promocodes"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    code = Column(String, unique=True, index=True)
+    discount_type = Column(String) # 'percent', 'fixed', 'trial'
+    value = Column(Integer) # Discount value or trial days
+    tribute_link_month = Column(String, nullable=True) # Link to discounted monthly product
+    tribute_link_year = Column(String, nullable=True) # Link to discounted yearly product
+    max_uses = Column(Integer, default=0) # 0 = unlimited
+    used_count = Column(Integer, default=0)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 
 def init_db():

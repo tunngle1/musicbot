@@ -31,43 +31,54 @@ interface PaymentViewProps {
 const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
     const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>(PLANS[0]);
     const [isLoading, setIsLoading] = useState(false);
+    const [promoCode, setPromoCode] = useState('');
+    const [appliedPromo, setAppliedPromo] = useState<{
+        code: string;
+        discount_type: string;
+        value: number;
+        tribute_link_month: string | null;
+        tribute_link_year: string | null;
+    } | null>(null);
+    const [promoMessage, setPromoMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-    const handleStarsPayment = async () => {
+    const handleApplyPromo = async () => {
+        if (!promoCode.trim()) return;
         setIsLoading(true);
         try {
-            // 1. Создаем инвойс на бэкенде
-            const response = await fetch(`${API_BASE_URL}/api/payment/stars/create`, {
+            const response = await fetch(`${API_BASE_URL}/api/payment/check-promo`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: user?.id,
-                    plan: selectedPlan.id
-                })
+                body: JSON.stringify({ code: promoCode })
             });
-
             const data = await response.json();
 
-            if (data.status === 'ok' && data.invoice_link) {
-                // 2. Открываем инвойс через WebApp
-                window.Telegram.WebApp.openInvoice(data.invoice_link, (status) => {
-                    if (status === 'paid') {
-                        window.Telegram.WebApp.showAlert('Оплата прошла успешно! Премиум активирован.');
-                        onClose();
-                    } else if (status === 'cancelled') {
-                        // Пользователь отменил
-                    } else {
-                        window.Telegram.WebApp.showAlert('Ошибка при оплате.');
-                    }
-                    setIsLoading(false);
+            if (data.valid) {
+                setAppliedPromo({
+                    code: promoCode,
+                    discount_type: data.discount_type,
+                    value: data.value,
+                    tribute_link_month: data.tribute_link_month,
+                    tribute_link_year: data.tribute_link_year
                 });
+                setPromoMessage({ type: 'success', text: data.message });
             } else {
-                throw new Error('Failed to create invoice');
+                setAppliedPromo(null);
+                setPromoMessage({ type: 'error', text: data.message });
             }
         } catch (error) {
-            console.error('Payment error:', error);
-            window.Telegram.WebApp.showAlert('Ошибка соединения с сервером.');
-            setIsLoading(false);
+            setPromoMessage({ type: 'error', text: 'Ошибка проверки промокода' });
         }
+        setIsLoading(false);
+    };
+
+    const getDiscountedPrice = (originalPrice: number) => {
+        if (!appliedPromo) return originalPrice;
+        if (appliedPromo.discount_type === 'percent') {
+            return originalPrice * (1 - appliedPromo.value / 100);
+        } else if (appliedPromo.discount_type === 'fixed') {
+            return Math.max(0, originalPrice - appliedPromo.value);
+        }
+        return originalPrice;
     };
 
     const handleTributePayment = async () => {
@@ -80,8 +91,16 @@ const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
             }
             const config = await configResponse.json();
 
-            // Выбираем ссылку в зависимости от плана
-            const link = selectedPlan.id === 'month' ? config.tribute_link_month : config.tribute_link_year;
+            // Выбираем ссылку: если есть промокод и для этого плана есть спец. ссылка - берем её
+            let link = selectedPlan.id === 'month' ? config.tribute_link_month : config.tribute_link_year;
+
+            if (appliedPromo) {
+                if (selectedPlan.id === 'month' && appliedPromo.tribute_link_month) {
+                    link = appliedPromo.tribute_link_month;
+                } else if (selectedPlan.id === 'year' && appliedPromo.tribute_link_year) {
+                    link = appliedPromo.tribute_link_year;
+                }
+            }
 
             if (link) {
                 // Открываем Tribute Mini App
@@ -148,6 +167,31 @@ const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
                     ))}
                 </div>
 
+                {/* Промокод */}
+                <div className="space-y-2">
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="Есть промокод?"
+                            value={promoCode}
+                            onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                        <button
+                            onClick={handleApplyPromo}
+                            disabled={!promoCode || isLoading}
+                            className="px-4 py-2 bg-blue-500/20 text-blue-400 font-bold rounded-xl hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+                        >
+                            {isLoading ? <Loader size={18} className="animate-spin" /> : 'OK'}
+                        </button>
+                    </div>
+                    {promoMessage && (
+                        <div className={`text-xs font-medium ${promoMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                            {promoMessage.text}
+                        </div>
+                    )}
+                </div>
+
                 {/* Кнопки оплаты */}
                 <div className="space-y-3 pt-2">
                     <button
@@ -156,7 +200,8 @@ const PaymentView: React.FC<PaymentViewProps> = ({ user, onClose }) => {
                         className="w-full py-4 bg-[#0098EA] hover:bg-[#0088D0] text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
                     >
                         <CreditCard size={20} />
-                        Оплатить {selectedPlan.priceTon * 100}₽ (Карта / СБП)
+                        Оплатить {getDiscountedPrice(selectedPlan.priceTon * 100).toFixed(0)}₽ (Карта / СБП)
+                        {appliedPromo && <span className="text-xs line-through opacity-70 ml-1">{selectedPlan.priceTon * 100}₽</span>}
                     </button>
 
                     <p className="text-center text-xs text-gray-500 mt-2">

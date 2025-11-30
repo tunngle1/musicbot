@@ -5,9 +5,9 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 try:
-    from backend.database import User
+    from backend.database import User, Payment
 except ImportError:
-    from database import User
+    from database import User, Payment
 
 # Константы для оплаты
 STARS_PRICE_MONTH = 100  # Цена в звездах за месяц (пример)
@@ -188,10 +188,15 @@ def grant_premium_after_payment(db: Session, user_id: int, plan: str, payment_me
     Выдает премиум и сохраняет запись о платеже.
     """
     try:
-        from backend.database import Payment
+        print(f"DEBUG: Starting grant_premium_after_payment for {user_id}")
+        print(f"DEBUG: User model: {User}")
+        print(f"DEBUG: Payment model: {Payment}")
         
         user = db.query(User).filter(User.id == user_id).first()
+        print(f"DEBUG: User query result: {user}")
+        
         if not user:
+            print("DEBUG: User not found")
             return False
             
         now = datetime.utcnow()
@@ -204,6 +209,7 @@ def grant_premium_after_payment(db: Session, user_id: int, plan: str, payment_me
             user.premium_expires_at = now + timedelta(days=days)
             
         user.is_premium = True
+        print("DEBUG: User updated")
         
         # Сохраняем платеж
         payment = Payment(
@@ -214,12 +220,16 @@ def grant_premium_after_payment(db: Session, user_id: int, plan: str, payment_me
             status="completed",
             created_at=now
         )
+        print("DEBUG: Payment object created")
         db.add(payment)
+        print("DEBUG: Payment added to session")
         
         db.commit()
         print(f"✅ Premium granted to {user_id} ({plan}) via {payment_method}")
         return True
     except Exception as e:
         print(f"❌ Error granting premium: {e}")
+        import traceback
+        traceback.print_exc()
         db.rollback()
         return False
