@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Upload, FileAudio, Music2, Trash2, Play, Loader2 } from 'lucide-react';
+import { Upload, FileAudio, Music2, Trash2, Play, Loader2, Clock } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { Track } from '../types';
 import { storage } from '../utils/storage';
@@ -7,16 +7,9 @@ import { API_BASE_URL } from '../constants';
 import CircularProgress from '../components/CircularProgress';
 
 const LibraryView: React.FC = () => {
-  const { addTrack, playTrack, currentTrack, isPlaying, removeDownloadedTrack, togglePlay, downloadProgress, downloadTrack, downloadedTracks, downloadQueue } = usePlayer();
+  const { addTrack, playTrack, currentTrack, isPlaying, removeDownloadedTrack, togglePlay, downloadProgress, downloadTrack, downloadedTracks, downloadQueue, isDownloading: isDownloadingId } = usePlayer();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [libraryTracks, setLibraryTracks] = useState<Track[]>([]);
-  const [storageInfo, setStorageInfo] = useState<{
-    usedMB: string;
-    quotaMB: string;
-    remainingMB: number;
-    estimatedTracks: number;
-    isPersisted: boolean;
-  } | null>(null);
 
   // YouTube State
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -85,7 +78,6 @@ const LibraryView: React.FC = () => {
 
   useEffect(() => {
     loadLibraryTracks();
-    loadStorageInfo();
   }, []);
 
   // Sync library tracks with downloadedTracks and downloadQueue from context
@@ -118,33 +110,6 @@ const LibraryView: React.FC = () => {
 
     const combinedTracks = Array.from(allTracksMap.values());
     setLibraryTracks(combinedTracks.reverse());
-  };
-
-  const loadStorageInfo = async () => {
-    try {
-      let isPersisted = false;
-      if (navigator.storage && navigator.storage.persisted) {
-        isPersisted = await navigator.storage.persisted();
-      }
-
-      if (navigator.storage && navigator.storage.estimate) {
-        const estimate = await navigator.storage.estimate();
-        const usedBytes = estimate.usage || 0;
-        const quotaBytes = estimate.quota || 0;
-        const remainingBytes = quotaBytes - usedBytes;
-
-        const usedMB = (usedBytes / 1024 / 1024).toFixed(2);
-        const quotaMB = (quotaBytes / 1024 / 1024).toFixed(2);
-        const remainingMB = remainingBytes / 1024 / 1024;
-
-        // Average track size ~8MB
-        const estimatedTracks = Math.floor(remainingMB / 8);
-
-        setStorageInfo({ usedMB, quotaMB, remainingMB, estimatedTracks, isPersisted });
-      }
-    } catch (error) {
-      console.error('Error loading storage info:', error);
-    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,8 +145,6 @@ const LibraryView: React.FC = () => {
     if (confirm('Удалить этот трек из загрузок?')) {
       await removeDownloadedTrack(trackId);
       setLibraryTracks(prev => prev.filter(t => t.id !== trackId));
-      // Reload storage info after deletion
-      loadStorageInfo();
     }
   };
 
@@ -190,34 +153,6 @@ const LibraryView: React.FC = () => {
       <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
         Медиатека
       </h1>
-
-      {/* Storage Info Card */}
-      {storageInfo && (
-        <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/10 rounded-xl p-4">
-          <div className="flex items-start justify-between mb-2">
-            <div>
-              <h3 className="text-sm font-semibold text-white mb-1">Хранилище</h3>
-              <p className="text-xs text-gray-400">
-                Использовано: {storageInfo.usedMB} МБ / {storageInfo.quotaMB} МБ
-              </p>
-              <p className="text-xs text-blue-400 mt-1 font-medium">
-                Можно скачать еще ~{storageInfo.estimatedTracks} треков
-              </p>
-            </div>
-            <div className={`px-2 py-1 rounded-full text-xs font-medium ${storageInfo.isPersisted
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-yellow-500/20 text-yellow-400'
-              }`}>
-              {storageInfo.isPersisted ? '🔒 Защищено' : '⚠️ Не защищено'}
-            </div>
-          </div>
-          {!storageInfo.isPersisted && (
-            <p className="text-xs text-gray-500 mt-2">
-              💡 Данные могут быть удалены при нехватке места. Не очищайте кэш Telegram вручную.
-            </p>
-          )}
-        </div>
-      )}
 
       {/* YouTube Download Section */}
       <div className="bg-gradient-to-br from-red-500/10 to-orange-500/10 border border-white/10 rounded-xl p-4 space-y-3">
@@ -306,13 +241,20 @@ const LibraryView: React.FC = () => {
             {libraryTracks.map(track => {
               const isCurrent = currentTrack?.id === track.id;
               const progress = downloadProgress.get(track.id);
+              // It is downloading if progress is defined and < 100
               const isDownloading = progress !== undefined && progress < 100;
+
+              // It is pending if it is in the queue, but NOT the one currently downloading (isDownloadingId)
+              // AND it doesn't have active progress yet.
+              // Actually, simpler check: if it's in downloadQueue but progress is undefined
+              const isInQueue = downloadQueue.some(t => t.id === track.id);
+              const isPending = isInQueue && progress === undefined && track.id !== isDownloadingId;
 
               return (
                 <div
                   key={track.id}
                   onClick={() => {
-                    if (!isDownloading) {
+                    if (!isDownloading && !isPending) {
                       if (currentTrack?.id === track.id) {
                         togglePlay();
                       } else {
@@ -320,19 +262,19 @@ const LibraryView: React.FC = () => {
                       }
                     }
                   }}
-                  className={`flex items-center p-3 rounded-xl transition-all ${isDownloading ? 'cursor-default' : 'cursor-pointer'} ${isCurrent ? 'bg-white/10 border border-white/5' : 'bg-gray-800/30 border border-transparent hover:bg-gray-800/50'
+                  className={`flex items-center p-3 rounded-xl transition-all ${isDownloading || isPending ? 'cursor-default' : 'cursor-pointer'} ${isCurrent ? 'bg-white/10 border border-white/5' : 'bg-gray-800/30 border border-transparent hover:bg-gray-800/50'
                     }`}
                 >
                   <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 mr-3">
                     <img
                       src={track.coverUrl || track.image}
                       alt={track.title}
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover ${(isDownloading || isPending) ? 'opacity-50' : ''}`}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(track.artist)}&size=200&background=random`;
                       }}
                     />
-                    {!isDownloading && (
+                    {!isDownloading && !isPending && (
                       <div className={`absolute inset-0 bg-black/40 flex items-center justify-center ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}>
                         {isCurrent && isPlaying ? (
                           <div className="flex space-x-[2px] items-end h-3">
@@ -345,24 +287,35 @@ const LibraryView: React.FC = () => {
                         )}
                       </div>
                     )}
+
+                    {isPending && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                        <Clock size={20} className="text-white/80" />
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <h4 className={`text-sm font-medium truncate ${isCurrent ? 'text-blue-400' : 'text-white'}`}>{track.title}</h4>
                     <p className="text-xs text-gray-400 truncate">{track.artist}</p>
+                    {isPending && <p className="text-[10px] text-yellow-500/80 mt-0.5">В очереди...</p>}
                   </div>
 
                   {isDownloading ? (
                     <div className="ml-2">
                       <CircularProgress progress={progress} size={36} />
                     </div>
-                  ) : (
+                  ) : !isPending ? (
                     <button
                       onClick={(e) => handleDelete(e, track.id)}
                       className="p-2 text-gray-500 hover:text-red-400 transition-colors"
                     >
                       <Trash2 size={18} />
                     </button>
+                  ) : (
+                    <div className="px-2">
+                      {/* Placeholder for alignment or maybe a cancel button later */}
+                    </div>
                   )}
                 </div>
               )
