@@ -880,12 +880,12 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Queue processor
   useEffect(() => {
-    if (!isDownloading && downloadQueue.length > 0) {
-      const nextTrack = downloadQueue[0];
-      setDownloadQueue(prev => prev.slice(1));
+    if (!isDownloading && downloadQueueState.length > 0) {
+      const nextTrack = downloadQueueState[0];
+      // Don't remove here, processDownload handles removal upon completion/error
       processDownload(nextTrack);
     }
-  }, [isDownloading, downloadQueue]);
+  }, [isDownloading, downloadQueueState]);
 
   const downloadTrack = async (track: Track) => {
     // Check if already downloaded
