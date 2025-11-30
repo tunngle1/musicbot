@@ -7,7 +7,7 @@ import { API_BASE_URL } from '../constants';
 import CircularProgress from '../components/CircularProgress';
 
 const LibraryView: React.FC = () => {
-  const { addTrack, playTrack, currentTrack, isPlaying, removeDownloadedTrack, togglePlay, markTrackAsDownloaded, downloadProgress } = usePlayer();
+  const { addTrack, playTrack, currentTrack, isPlaying, removeDownloadedTrack, togglePlay, downloadProgress, downloadTrack, downloadedTracks } = usePlayer();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [libraryTracks, setLibraryTracks] = useState<Track[]>([]);
   const [storageInfo, setStorageInfo] = useState<{
@@ -21,7 +21,6 @@ const LibraryView: React.FC = () => {
   // YouTube State
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [isYoutubeLoading, setIsYoutubeLoading] = useState(false);
-  const [isDownloadingApp, setIsDownloadingApp] = useState(false);
   const [isDownloadingChat, setIsDownloadingChat] = useState(false);
   const [foundYoutubeTrack, setFoundYoutubeTrack] = useState<Track | null>(null);
 
@@ -50,39 +49,10 @@ const LibraryView: React.FC = () => {
 
     try {
       if (target === 'app') {
-        setIsDownloadingApp(true);
-        // Download to App via Server File Download (Reliable)
-        const downloadUrl = `${API_BASE_URL}/api/youtube/download_file?url=${encodeURIComponent(youtubeUrl)}`;
-
-        const audioRes = await fetch(downloadUrl);
-        if (!audioRes.ok) throw new Error('Failed to download audio file from server');
-
-        const audioBlob = await audioRes.blob();
-        const objectUrl = URL.createObjectURL(audioBlob);
-
-        // Try to get cover blob
-        let coverBlob = null;
-        try {
-          const coverRes = await fetch(foundYoutubeTrack.image);
-          coverBlob = await coverRes.blob();
-        } catch (e) { console.warn("Failed to fetch cover", e); }
-
-        const newTrack: Track = {
-          ...foundYoutubeTrack,
-          audioUrl: objectUrl,
-          coverUrl: foundYoutubeTrack.image, // Keep original URL as fallback
-          isLocal: true
-        };
-
-        addTrack(newTrack);
-        await storage.saveTrack(newTrack, audioBlob, coverBlob);
-        markTrackAsDownloaded(newTrack.id);
-
-        setLibraryTracks(prev => [newTrack, ...prev]);
+        // Use downloadTrack from context - it handles progress tracking
+        downloadTrack(foundYoutubeTrack);
         setYoutubeUrl('');
         setFoundYoutubeTrack(null);
-
-        alert('Трек сохранен в медиатеку!');
       } else {
         setIsDownloadingChat(true);
         // Download to Chat
@@ -109,7 +79,6 @@ const LibraryView: React.FC = () => {
     } catch (e) {
       alert('Ошибка загрузки: ' + e);
     } finally {
-      setIsDownloadingApp(false);
       setIsDownloadingChat(false);
     }
   };
@@ -119,11 +88,16 @@ const LibraryView: React.FC = () => {
     loadStorageInfo();
   }, []);
 
+  // Sync library tracks with downloadedTracks from context
+  useEffect(() => {
+    loadLibraryTracks();
+  }, [downloadedTracks]);
+
   const loadLibraryTracks = async () => {
     const tracks = await storage.getAllTracks();
     // Filter only downloaded tracks (isLocal = true) and sort by newest
-    const downloadedTracks = tracks.filter(t => t.isLocal);
-    setLibraryTracks(downloadedTracks.reverse());
+    const downloadedTracksList = tracks.filter(t => t.isLocal);
+    setLibraryTracks(downloadedTracksList.reverse());
   };
 
   const loadStorageInfo = async () => {
@@ -258,15 +232,15 @@ const LibraryView: React.FC = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => handleYoutubeDownload('app')}
-                disabled={isDownloadingApp || isDownloadingChat}
+                disabled={isDownloadingChat}
                 className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 disabled:opacity-50"
                 title="Скачать в приложение"
               >
-                {isDownloadingApp ? <Loader2 size={18} className="animate-spin" /> : <FileAudio size={18} />}
+                <FileAudio size={18} />
               </button>
               <button
                 onClick={() => handleYoutubeDownload('chat')}
-                disabled={isDownloadingApp || isDownloadingChat}
+                disabled={isDownloadingChat}
                 className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 disabled:opacity-50"
                 title="Отправить в чат"
               >
@@ -318,35 +292,39 @@ const LibraryView: React.FC = () => {
                 <div
                   key={track.id}
                   onClick={() => {
-                    if (currentTrack?.id === track.id) {
-                      togglePlay();
-                    } else {
-                      playTrack(track, libraryTracks);
+                    if (!isDownloading) {
+                      if (currentTrack?.id === track.id) {
+                        togglePlay();
+                      } else {
+                        playTrack(track, libraryTracks);
+                      }
                     }
                   }}
-                  className={`flex items-center p-3 rounded-xl transition-all cursor-pointer ${isCurrent ? 'bg-white/10 border border-white/5' : 'bg-gray-800/30 border border-transparent hover:bg-gray-800/50'
+                  className={`flex items-center p-3 rounded-xl transition-all ${isDownloading ? 'cursor-default' : 'cursor-pointer'} ${isCurrent ? 'bg-white/10 border border-white/5' : 'bg-gray-800/30 border border-transparent hover:bg-gray-800/50'
                     }`}
                 >
                   <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 mr-3">
                     <img
-                      src={track.coverUrl}
+                      src={track.coverUrl || track.image}
                       alt={track.title}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(track.artist)}&size=200&background=random`;
                       }}
                     />
-                    <div className={`absolute inset-0 bg-black/40 flex items-center justify-center ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}>
-                      {isCurrent && isPlaying ? (
-                        <div className="flex space-x-[2px] items-end h-3">
-                          <div className="w-[2px] bg-white animate-bounce h-2"></div>
-                          <div className="w-[2px] bg-white animate-bounce h-3 delay-75"></div>
-                          <div className="w-[2px] bg-white animate-bounce h-2 delay-150"></div>
-                        </div>
-                      ) : (
-                        <Play size={16} fill="white" />
-                      )}
-                    </div>
+                    {!isDownloading && (
+                      <div className={`absolute inset-0 bg-black/40 flex items-center justify-center ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}>
+                        {isCurrent && isPlaying ? (
+                          <div className="flex space-x-[2px] items-end h-3">
+                            <div className="w-[2px] bg-white animate-bounce h-2"></div>
+                            <div className="w-[2px] bg-white animate-bounce h-3 delay-75"></div>
+                            <div className="w-[2px] bg-white animate-bounce h-2 delay-150"></div>
+                          </div>
+                        ) : (
+                          <Play size={16} fill="white" />
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">

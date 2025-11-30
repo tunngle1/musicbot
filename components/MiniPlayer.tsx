@@ -19,6 +19,7 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ onExpand }) => {
   return (
     <div
       className="fixed bottom-20 left-4 right-4 glass-panel rounded-2xl p-3 flex items-center z-30 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 animate-slide-up"
+      style={{ position: 'fixed', bottom: '5rem' }}
       onClick={onExpand}
     >
       {/* Прогресс бар - интегрирован в фон */}
