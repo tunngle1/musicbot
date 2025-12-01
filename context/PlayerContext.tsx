@@ -825,7 +825,17 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       console.log("Downloading track:", track.title);
 
       // 1. Скачиваем аудио с отслеживанием прогресса
-      const audioResponse = await fetch(track.audioUrl);
+      let audioResponse: Response;
+
+      // Для YouTube треков используем специальный endpoint
+      if (track.id.startsWith('yt_')) {
+        console.log("YouTube track detected, using download endpoint");
+        const downloadUrl = `${API_BASE_URL}/api/youtube/download_file?url=${encodeURIComponent(track.audioUrl)}`;
+        audioResponse = await fetch(downloadUrl);
+      } else {
+        audioResponse = await fetch(track.audioUrl);
+      }
+
       if (!audioResponse.ok) throw new Error('Audio download failed');
 
       const contentLength = audioResponse.headers.get('content-length');

@@ -1277,8 +1277,8 @@ async def download_to_chat(request: DownloadToChatRequest, db: Session = Depends
         if user and user.is_premium_pro:
             protect_content = False
         
-        # 1. Download audio file from URL
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # 1. Download audio file from URL (увеличен timeout для больших файлов)
+        async with httpx.AsyncClient(timeout=120.0) as client:
             audio_response = await client.get(request.track.url)
             audio_response.raise_for_status()
             audio_data = audio_response.content
@@ -1290,15 +1290,28 @@ async def download_to_chat(request: DownloadToChatRequest, db: Session = Depends
             'audio': ('track.mp3', audio_data, 'audio/mpeg')
         }
         
+        # Скачиваем обложку, если есть
+        thumbnail_data = None
+        if request.track.image:
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as thumb_client:
+                    thumb_response = await thumb_client.get(request.track.image)
+                    if thumb_response.status_code == 200:
+                        thumbnail_data = thumb_response.content
+                        files['thumbnail'] = ('thumb.jpg', thumbnail_data, 'image/jpeg')
+            except Exception as e:
+                print(f"Failed to download thumbnail: {e}")
+        
         data = {
             'chat_id': request.user_id,
             'title': request.track.title,
             'performer': request.track.artist,
-            'duration': request.track.duration,
+            'duration': request.track.duration if request.track.duration > 0 else None,
             'protect_content': protect_content  # Premium Pro может пересылать
         }
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # 2. Send to Telegram (увеличен timeout для загрузки больших файлов)
+        async with httpx.AsyncClient(timeout=180.0) as client:
             response = await client.post(telegram_url, files=files, data=data)
             response.raise_for_status()
             result = response.json()
@@ -1453,6 +1466,15 @@ async def get_youtube_file(url: str, background_tasks: BackgroundTasks):
             'quiet': False,
             'no_warnings': False,
             'ffmpeg_location': r'C:\ffmpeg-2025-11-27-git-61b034a47c-essentials_build\bin',
+            # Современный user-agent для обхода блокировок
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            # Используем Android и Web клиенты для обхода ограничений
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                    'skip': ['dash', 'hls']
+                }
+            },
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',

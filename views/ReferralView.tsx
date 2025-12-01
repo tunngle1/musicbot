@@ -155,17 +155,17 @@ const ReferralView: React.FC<ReferralViewProps> = ({ onBack }) => {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-3 gap-4">
-                <div className="glass-panel p-4 rounded-xl text-center">
-                    <div className="text-2xl font-bold text-white mb-1">{stats?.total_referrals || 0}</div>
-                    <div className="text-xs text-white/60">Всего</div>
+                <div className="glass-panel p-5 rounded-xl text-center">
+                    <div className="text-3xl font-bold text-white mb-2">{stats?.total_referrals || 0}</div>
+                    <div className="text-sm text-white/70 leading-tight">Всего</div>
                 </div>
-                <div className="glass-panel p-4 rounded-xl text-center">
-                    <div className="text-2xl font-bold text-green-400 mb-1">{stats?.completed_referrals || 0}</div>
-                    <div className="text-xs text-white/60">Активных</div>
+                <div className="glass-panel p-5 rounded-xl text-center">
+                    <div className="text-3xl font-bold text-green-400 mb-2">{stats?.completed_referrals || 0}</div>
+                    <div className="text-sm text-white/70 leading-tight">Активных</div>
                 </div>
-                <div className="glass-panel p-4 rounded-xl text-center">
-                    <div className="text-2xl font-bold text-yellow-400 mb-1">{stats?.pending_referrals || 0}</div>
-                    <div className="text-xs text-white/60">Ожидают</div>
+                <div className="glass-panel p-5 rounded-xl text-center">
+                    <div className="text-3xl font-bold text-yellow-400 mb-2">{stats?.pending_referrals || 0}</div>
+                    <div className="text-sm text-white/70 leading-tight">Ожидают</div>
                 </div>
             </div>
 
