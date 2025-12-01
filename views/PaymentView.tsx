@@ -11,7 +11,7 @@ const PLANS: SubscriptionPlan[] = [
         priceStars: 100,
         priceTon: 1.0,
         duration: '30 дней',
-        features: ['Безлимитное скачивание', 'Доступ к эксклюзивам', 'Поддержка авторов']
+        features: ['Доступ к сервису', 'Помощь проекту', 'Музыка в чате и приложении']
     },
     {
         id: 'year',
@@ -19,7 +19,7 @@ const PLANS: SubscriptionPlan[] = [
         priceStars: 1000,
         priceTon: 10.0,
         duration: '365 дней',
-        features: ['Все преимущества', 'Выгоднее на 20%', 'Золотой бейдж']
+        features: ['Доступ к сервису', 'Выгоднее на 20%', 'Золотой бейдж']
     }
 ];
 
