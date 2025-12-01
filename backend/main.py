@@ -1277,11 +1277,82 @@ async def download_to_chat(request: DownloadToChatRequest, db: Session = Depends
         if user and user.is_premium_pro:
             protect_content = False
         
-        # 1. Download audio file from URL (увеличен timeout для больших файлов)
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            audio_response = await client.get(request.track.url)
-            audio_response.raise_for_status()
-            audio_data = audio_response.content
+        # 1. Download audio file from URL
+        # Проверяем, является ли это YouTube треком
+        is_youtube = 'youtube.com' in request.track.url or 'youtu.be' in request.track.url
+        
+        if is_youtube:
+            # Для YouTube используем yt-dlp
+            import yt_dlp
+            import os
+            import tempfile
+            
+            print(f"📥 Downloading YouTube track for chat: {request.track.url}")
+            
+            # Create temp directory
+            temp_dir = tempfile.mkdtemp()
+            temp_path = os.path.join(temp_dir, 'audio')
+            
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'outtmpl': temp_path,
+                'quiet': False,
+                'no_warnings': False,
+                'ffmpeg_location': r'C:\ffmpeg-2025-11-27-git-61b034a47c-essentials_build\bin',
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web'],
+                        'skip': ['dash', 'hls']
+                    }
+                },
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+            }
+            
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([request.track.url])
+                
+                # Find the downloaded file
+                downloaded_file = None
+                if os.path.exists(temp_path):
+                    downloaded_file = temp_path
+                else:
+                    for ext in ['.mp3', '.webm', '.m4a', '.opus', '.mp4']:
+                        test_path = temp_path + ext
+                        if os.path.exists(test_path):
+                            downloaded_file = test_path
+                            break
+                
+                if not downloaded_file:
+                    files_in_dir = os.listdir(temp_dir) if os.path.exists(temp_dir) else []
+                    raise Exception(f"Downloaded file not found. Dir contents: {files_in_dir}")
+                
+                # Read file content
+                with open(downloaded_file, 'rb') as f:
+                    audio_data = f.read()
+                
+                print(f"✅ YouTube track downloaded: {len(audio_data)} bytes")
+                
+            finally:
+                # Cleanup temp directory
+                try:
+                    import shutil
+                    if os.path.exists(temp_dir):
+                        shutil.rmtree(temp_dir)
+                        print(f"🗑️ Cleaned up: {temp_dir}")
+                except Exception as e:
+                    print(f"Error cleaning up temp dir: {e}")
+        else:
+            # Для обычных треков используем httpx (увеличен timeout для больших файлов)
+            async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
+                audio_response = await client.get(request.track.url)
+                audio_response.raise_for_status()
+                audio_data = audio_response.content
         
         # 2. Send to Telegram
         telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendAudio"

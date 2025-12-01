@@ -73,7 +73,6 @@ const LibraryView: React.FC = () => {
       } else {
         // Download to Chat using context queue
         downloadToChat(foundYoutubeTrack);
-        alert('Трек добавлен в очередь отправки в чат!');
         setYoutubeUrl('');
         setFoundYoutubeTrack(null);
       }
