@@ -851,7 +851,14 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
       }
 
-      const audioBlob = new Blob(chunks, { type: audioResponse.headers.get('content-type') || 'audio/mpeg' });
+      const contentType = audioResponse.headers.get('content-type') || 'audio/mpeg';
+      let audioBlob: Blob;
+      try {
+        audioBlob = new Blob(chunks as BlobPart[], { type: contentType });
+      } catch (e) {
+        console.error("Blob creation error:", e);
+        throw e;
+      }
 
       // 2. Скачиваем обложку (если есть) - 90-95%
       setDownloadProgress(prev => new Map(prev).set(track.id, 90));
