@@ -1417,7 +1417,9 @@ async def get_youtube_info(request: YouTubeRequest):
             uploader = info.get('uploader', 'Unknown Artist')
             duration = info.get('duration', 0)
             thumbnail = info.get('thumbnail', '')
-            url = info.get('url') # Direct audio URL
+            # Для YouTube НЕ используем прямую ссылку (она истекает)
+            # Вместо этого сохраняем оригинальную YouTube ссылку
+            original_url = request.url
             
             # Clean up title
             clean_title = title.replace('(Official Video)', '').replace('[Official Video]', '').strip()
@@ -1436,7 +1438,7 @@ async def get_youtube_info(request: YouTubeRequest):
                 title=track_title,
                 artist=artist,
                 duration=duration,
-                url=url, 
+                url=original_url,  # Оригинальная YouTube ссылка
                 image=thumbnail
             )
             
