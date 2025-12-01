@@ -139,7 +139,7 @@ const LibraryView: React.FC = () => {
           isLocal: true
         };
 
-        addTrack(newTrack);
+        addTrack(newTrack, file);
         // Можно также сохранять загруженные файлы в storage, но пока оставим только в памяти
       });
     }

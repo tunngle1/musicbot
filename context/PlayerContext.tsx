@@ -716,10 +716,20 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [isPlaying]);
 
-  const addTrack = (track: Track) => {
-    setAllTracks(prev => [track, ...prev]);
-    setQueue(prev => [track, ...prev]);
-  };
+const addTrack = async (track: Track, audioFile?: File) => {
+  setAllTracks(prev => [track, ...prev]);
+  setQueue(prev => [track, ...prev]);
+  
+  // Если передан файл, сохраняем его в IndexedDB
+  if (audioFile) {
+    try {
+      await storage.saveTrack(track, audioFile);
+      console.log('Track saved to storage:', track.title);
+    } catch (error) {
+      console.error('Failed to save track to storage:', error);
+    }
+  }
+};
 
   const createPlaylist = (name: string, coverFile?: File) => {
     const newPlaylist: Playlist = {

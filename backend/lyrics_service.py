@@ -25,6 +25,152 @@ class LyricsService:
     
     def get_lyrics(self, title: str, artist: str) -> Optional[str]:
         """
+        Fetch lyrics for a song from Genius, fallback to Lyrics.ovh, then Text-You.ru
+        """
+        # 1. Try Genius
+        lyrics = self._get_from_genius(title, artist)
+        if lyrics:
+            return lyrics
+            
+        # 2. Fallback to Lyrics.ovh
+        lyrics = self._get_from_lyrics_ovh(title, artist)
+        if lyrics:
+            return lyrics
+
+        # 3. Fallback to Browser Search (Universal)
+        return self._search_via_browser(title, artist)
+
+    def _search_via_browser(self, title: str, artist: str) -> Optional[str]:
+        """
+        Universal fallback: Search via DuckDuckGo and scrape the first result
+        """
+        try:
+            print(f"🌍 Searching via browser for: {artist} - {title}")
+            
+            # 1. Search DuckDuckGo
+            # We use html.duckduckgo.com which is lighter and easier to scrape
+            query = f"{artist} {title} текст песни lyrics"
+            search_url = "https://html.duckduckgo.com/html/"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Referer': 'https://html.duckduckgo.com/'
+            }
+            
+            response = requests.post(search_url, data={'q': query}, headers=headers, timeout=10)
+            if response.status_code != 200:
+                return None
+                
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Find first result link (excluding ads)
+            # DDG HTML results are in div.result -> a.result__a
+            results = soup.select('a.result__a')
+            if not results:
+                print("No results in search")
+                return None
+                
+            # Skip YouTube links as they don't have lyrics text usually
+            target_url = None
+            for link in results:
+                href = link.get('href')
+                if 'youtube.com' not in href and 'youtu.be' not in href:
+                    target_url = href
+                    break
+            
+            if not target_url:
+                return None
+                
+            print(f"   Found source: {target_url}")
+            
+            # 2. Fetch the target page
+            page_response = requests.get(target_url, headers=headers, timeout=10)
+            if page_response.status_code != 200:
+                return None
+                
+            page_soup = BeautifulSoup(page_response.text, 'html.parser')
+            
+            # 3. Smart extraction of lyrics
+            # We look for the container with the most <br> tags or newlines
+            
+            # Remove scripts and styles
+            for script in page_soup(["script", "style", "header", "footer", "nav", "iframe"]):
+                script.decompose()
+                
+            # Strategy A: Look for common lyrics classes
+            lyrics_div = page_soup.find('div', class_=re.compile(r'lyrics|text|content|words', re.I))
+            
+            # Strategy B: Find div with most text content that looks like lyrics (short lines)
+            if not lyrics_div:
+                candidates = page_soup.find_all(['div', 'article', 'pre'])
+                best_candidate = None
+                max_score = 0
+                
+                for cand in candidates:
+                    text = cand.get_text('\n')
+                    lines = [l.strip() for l in text.split('\n') if l.strip()]
+                    if len(lines) < 5: continue
+                    
+                    # Score based on line length (lyrics usually have short lines)
+                    short_lines = sum(1 for l in lines if len(l) < 60)
+                    score = short_lines / len(lines)
+                    
+                    if len(lines) > 10 and score > 0.6:
+                        if len(lines) > max_score:
+                            max_score = len(lines)
+                            best_candidate = cand
+                
+                lyrics_div = best_candidate
+
+            if lyrics_div:
+                text = lyrics_div.get_text(separator='\n', strip=True)
+                # Basic cleanup
+                text = re.sub(r'\n{3,}', '\n\n', text)
+                return text[:4000] # Limit length
+                
+            return None
+            
+        except Exception as e:
+            print(f"Error in browser search: {e}")
+            return None
+
+    def _get_from_lyrics_ovh(self, title: str, artist: str) -> Optional[str]:
+        """
+        Fetch lyrics from Lyrics.ovh (fallback)
+        """
+        try:
+            print(f"Searching lyrics.ovh for: {artist} - {title}")
+            # Clean up artist and title for better search
+            clean_artist = re.sub(r'\(.*?\)', '', artist).strip()
+            clean_title = re.sub(r'\(.*?\)', '', title).strip()
+            
+            # Helper to fetch with timeout
+            def fetch(art, tit):
+                url = f"https://api.lyrics.ovh/v1/{art}/{tit}"
+                return requests.get(url, timeout=15)
+
+            response = fetch(clean_artist, clean_title)
+            
+            # If failed and artist has comma (multiple artists), try first artist only
+            if response.status_code != 200 and ',' in clean_artist:
+                first_artist = clean_artist.split(',')[0].strip()
+                print(f"   Retrying with first artist: {first_artist}")
+                response = fetch(first_artist, clean_title)
+            
+            if response.status_code == 200:
+                data = response.json()
+                lyrics = data.get('lyrics')
+                if lyrics:
+                    print(f"✅ Found lyrics on lyrics.ovh")
+                    return lyrics
+            
+            print(f"No lyrics found on lyrics.ovh")
+            return None
+        except Exception as e:
+            print(f"Error fetching from lyrics.ovh: {e}")
+            return None
+
+    def _get_from_genius(self, title: str, artist: str) -> Optional[str]:
+        """
         Fetch lyrics for a song from Genius
         
         Args:
@@ -42,6 +188,11 @@ class LyricsService:
             params = {'q': f"{title} {artist}"}
             
             response = requests.get(search_url, headers=self.headers, params=params, timeout=10)
+            
+            if response.status_code == 429:
+                print(f"⚠️ Rate limit exceeded for Genius API. Please try again later.")
+                print(f"   Tip: Genius API has request limits. Wait a few minutes or upgrade your API plan.")
+                return None
             
             if response.status_code != 200:
                 print(f"Search failed with status {response.status_code}")
