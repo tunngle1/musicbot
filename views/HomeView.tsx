@@ -58,7 +58,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
   const { playlists, addToPlaylist } = usePlayer();
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [trackToDownload, setTrackToDownload] = useState<Track | null>(null);
-  
+
 
   // Отображаемые треки: результаты поиска или все треки (с дедупликацией)
   const rawDisplayTracks = searchState.results.length > 0 ? searchState.results : (searchState.query.trim() ? [] : allTracks);
@@ -631,11 +631,13 @@ const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
       return;
     }
 
-    await downloadToChat(user.id, trackToDownload);
-    
+    // Закрываем окно сразу
     setShowDownloadModal(false);
     setTrackToDownload(null);
     hapticFeedback.success();
+
+    // Скачивание идет в фоне
+    await downloadToChat(user.id, trackToDownload);
 
   } catch (error) {
     console.error('Download to chat error:', error);
