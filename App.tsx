@@ -6,6 +6,7 @@ import BottomNav from './components/BottomNav';
 import MiniPlayer from './components/MiniPlayer';
 import FullPlayer from './components/FullPlayer';
 import SubscriptionBlocker from './components/SubscriptionBlocker';
+import InstallPrompt from './components/InstallPrompt';
 import HomeView from './views/HomeView';
 import PlaylistsView from './views/PlaylistsView';
 import FavoritesView from './views/FavoritesView';
@@ -233,6 +234,9 @@ const AppContent: React.FC = () => {
       {isFullPlayerOpen && (
         <FullPlayer onCollapse={() => setIsFullPlayerOpen(false)} />
       )}
+
+      {/* PWA Install Prompt */}
+      <InstallPrompt />
     </div>
   );
 };

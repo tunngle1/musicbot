@@ -83,6 +83,8 @@ interface TelegramWebApp {
     openInvoice: (url: string, callback?: (status: 'paid' | 'cancelled' | 'failed' | 'pending') => void) => void;
     onEvent: (eventType: string, callback: () => void) => void;
     offEvent: (eventType: string, callback: () => void) => void;
+    addToHomeScreen: () => void;
+    checkHomeScreenStatus: (callback: (status: 'unsupported' | 'unknown' | 'added' | 'missed') => void) => void;
 }
 
 declare global {
@@ -343,4 +345,28 @@ export const getColorScheme = (): 'light' | 'dark' => {
 export const getThemeParams = () => {
     const webApp = getTelegramWebApp();
     return webApp?.themeParams || {};
+};
+
+/**
+ * Добавить на главный экран (Telegram Mini App)
+ */
+export const addToHomeScreen = () => {
+    const webApp = getTelegramWebApp();
+    if (webApp && (webApp as any).addToHomeScreen) {
+        (webApp as any).addToHomeScreen();
+    } else {
+        console.warn('addToHomeScreen is not supported in this version of Telegram WebApp');
+    }
+};
+
+/**
+ * Проверить статус добавления на главный экран
+ */
+export const checkHomeScreenStatus = (callback: (status: 'unsupported' | 'unknown' | 'added' | 'missed') => void) => {
+    const webApp = getTelegramWebApp();
+    if (webApp && (webApp as any).checkHomeScreenStatus) {
+        (webApp as any).checkHomeScreenStatus(callback);
+    } else {
+        callback('unsupported');
+    }
 };
